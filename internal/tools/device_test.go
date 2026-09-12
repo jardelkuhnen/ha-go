@@ -1,7 +1,16 @@
 package tools
 
 import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
+
+	"home-assistent-go/internal/config"
+	"home-assistent-go/internal/ha"
 )
 
 func TestValidEntityID(t *testing.T) { // §3: apenas switch/light/media_player + sufixo não vazio
@@ -76,5 +85,180 @@ func TestConfirmationPhrase(t *testing.T) { // §5: frases fixas por ação
 		if got := confirmationPhrase(tc.acao, tc.apelido); got != tc.want {
 			t.Errorf("confirmationPhrase(%q, %q) = %q; want %q", tc.acao, tc.apelido, got, tc.want)
 		}
+	}
+}
+
+// gravada guarda o que o servidor de teste viu da última requisição.
+type gravada struct {
+	Method string
+	Path   string
+	Body   []byte
+}
+
+// novoServidor cria um httptest.Server que grava a última requisição em g e
+// responde com o status e corpo informados.
+func novoServidor(t *testing.T, g *gravada, status int, corpo string) *httptest.Server {
+	t.Helper()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		*g = gravada{Method: r.Method, Path: r.URL.Path, Body: body}
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(corpo))
+	}))
+	t.Cleanup(ts.Close)
+	return ts
+}
+
+// novoClient cria o client de produção (ha.NewClient) apontando para o
+// servidor de teste — a tool nunca monta HTTP própria (decisão 7 da spec 03).
+func novoClient(ts *httptest.Server) *ha.Client {
+	return ha.NewClient(config.Settings{
+		HAURL:     ts.URL,
+		HAToken:   "token-de-teste",
+		HATimeout: 5 * time.Second,
+	})
+}
+
+// corpoComEntity assegura que o JSON gravado carrega o entity_id esperado.
+func corpoComEntity(t *testing.T, body []byte, want string) {
+	t.Helper()
+	var got map[string]any
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("corpo não é JSON de objeto: %q (%v)", body, err)
+	}
+	if got["entity_id"] != want {
+		t.Errorf("entity_id = %v; want %q", got["entity_id"], want)
+	}
+}
+
+func TestOnNoSwitchComApelido(t *testing.T) { // critério 1
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
+
+	got := controlDevice(context.Background(), cli, "on", "switch.tomada_sala")
+	if got != "Liguei o tomada da sala." {
+		t.Errorf("frase = %q; want %q", got, "Liguei o tomada da sala.")
+	}
+	if g.Method != http.MethodPost || g.Path != "/api/services/switch/turn_on" {
+		t.Errorf("requisição: %s %s; want POST /api/services/switch/turn_on", g.Method, g.Path)
+	}
+	corpoComEntity(t, g.Body, "switch.tomada_sala")
+}
+
+func TestOffNaLuzComApelido(t *testing.T) { // critério 2
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
+
+	got := controlDevice(context.Background(), cli, "off", "light.luz_sala")
+	if got != "Desliguei o luz da sala." {
+		t.Errorf("frase = %q; want %q", got, "Desliguei o luz da sala.")
+	}
+	if g.Method != http.MethodPost || g.Path != "/api/services/light/turn_off" {
+		t.Errorf("requisição: %s %s; want POST /api/services/light/turn_off", g.Method, g.Path)
+	}
+	corpoComEntity(t, g.Body, "light.luz_sala")
+}
+
+func TestToggleSemApelido(t *testing.T) { // critério 3: homeassistant/toggle + entity cru
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
+
+	got := controlDevice(context.Background(), cli, "toggle", "switch.ventilador")
+	if got != "Alternei o switch.ventilador." {
+		t.Errorf("frase = %q; want %q", got, "Alternei o switch.ventilador.")
+	}
+	if g.Method != http.MethodPost || g.Path != "/api/services/homeassistant/toggle" {
+		t.Errorf("requisição: %s %s; want POST /api/services/homeassistant/toggle", g.Method, g.Path)
+	}
+	corpoComEntity(t, g.Body, "switch.ventilador")
+}
+
+func TestToggleComApelido(t *testing.T) { // §5: toggle de entity conhecido usa o apelido
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
+
+	got := controlDevice(context.Background(), cli, "toggle", "media_player.alexa_sala")
+	if got != "Alternei o Alexa da sala." {
+		t.Errorf("frase = %q; want %q", got, "Alternei o Alexa da sala.")
+	}
+}
+
+func TestEntityInvalidoNaoChamaHA(t *testing.T) { // critério 4: zero requests
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
+
+	got := controlDevice(context.Background(), cli, "on", "camera.frente")
+	if got != fallbackControlDevice {
+		t.Errorf("frase = %q; want fallback %q", got, fallbackControlDevice)
+	}
+	if g.Method != "" || g.Path != "" {
+		t.Errorf("requisição feita ao HA: %s %s; want nenhuma", g.Method, g.Path)
+	}
+}
+
+func TestEntitySemPontoOuVazio(t *testing.T) { // critério 5
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
+
+	for _, entity := range []string{"tomada", "", "switch."} {
+		if got := controlDevice(context.Background(), cli, "on", entity); got != fallbackControlDevice {
+			t.Errorf("entity %q: frase = %q; want fallback", entity, got)
+		}
+	}
+	if g.Method != "" {
+		t.Errorf("requisição feita ao HA: %s %s; want nenhuma", g.Method, g.Path)
+	}
+}
+
+func TestHA500FallbackSemPanico(t *testing.T) { // critério 6
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusInternalServerError, `{"message":"boom"}`)
+	cli := novoClient(ts)
+
+	got := controlDevice(context.Background(), cli, "on", "switch.tomada_sala")
+	if got != fallbackControlDevice {
+		t.Errorf("frase = %q; want fallback", got)
+	}
+}
+
+func TestAcaoInvalidaNaoChamaHA(t *testing.T) { // §2: action fora do enum
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
+
+	if got := controlDevice(context.Background(), cli, "reboot", "switch.tomada_sala"); got != fallbackControlDevice {
+		t.Errorf("frase = %q; want fallback", got)
+	}
+	if g.Method != "" {
+		t.Errorf("requisição feita ao HA: %s %s; want nenhuma", g.Method, g.Path)
+	}
+}
+
+func TestClientNuloFallbackSemPanico(t *testing.T) { // defensivo: wiring errado não panica
+	got := controlDevice(context.Background(), nil, "on", "switch.tomada_sala")
+	if got != fallbackControlDevice {
+		t.Errorf("frase = %q; want fallback", got)
+	}
+}
+
+func TestContextoDoTurnoVence(t *testing.T) { // §4: deadline do ctx propaga → fallback
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(ts.Close)
+	cli := novoClient(ts)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	if got := controlDevice(ctx, cli, "on", "switch.tomada_sala"); got != fallbackControlDevice {
+		t.Errorf("frase = %q; want fallback (deadline do ctx)", got)
 	}
 }

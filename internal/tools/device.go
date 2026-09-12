@@ -7,7 +7,11 @@
 package tools
 
 import (
+	"context"
+	"log"
 	"strings"
+
+	"home-assistent-go/internal/ha"
 )
 
 // Ações aceitas pela tool control_device (§2) — estrito, sem normalização.
@@ -79,4 +83,40 @@ func confirmationPhrase(action, alias string) string {
 		return "Alternei o " + alias + "."
 	}
 	return fallbackControlDevice
+}
+
+// controlDevice executa a tool control_device (§4): valida ação e entity_id
+// (nesta ordem, ANTES de tocar no HA — baseline item 3), aciona o client HA
+// injetado e devolve confirmação falável com apelido (§5) — ou a frase de
+// fallback em qualquer falha. Nunca devolve erro nem panico (design defensivo
+// F05): rede/HTTP/timeout/deadline do ctx/client nulo → fallback.
+func controlDevice(ctx context.Context, cli *ha.Client, action, entityID string) string {
+	if !validAction(action) {
+		log.Printf("tools: control_device: ação inválida %q", action)
+		return fallbackControlDevice
+	}
+	if !validEntityID(entityID) {
+		log.Printf("tools: control_device: entity_id inválido %q", entityID)
+		return fallbackControlDevice
+	}
+	if cli == nil {
+		log.Printf("tools: control_device: client HA ausente (wiring)")
+		return fallbackControlDevice
+	}
+	var err error
+	switch action {
+	case actionOn:
+		_, err = cli.TurnOn(ctx, entityID)
+	case actionOff:
+		_, err = cli.TurnOff(ctx, entityID)
+	case actionToggle:
+		_, err = cli.Toggle(ctx, entityID)
+	}
+	if err != nil {
+		// O erro do client é sanitizado (nunca contém o token) e entity_id
+		// não é secret — seguro para o log de diagnóstico.
+		log.Printf("tools: control_device: falha do HA para %s: %v", entityID, err)
+		return fallbackControlDevice
+	}
+	return confirmationPhrase(action, aliasOf(entityID))
 }
