@@ -67,7 +67,7 @@ func (s *server) chat(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// (a timeline §3 entra na Task 2, junto dos testes dela)
+	s.emitirTimeline(out) // §3: um evento por etapa — turnos concluídos apenas
 	c.JSON(http.StatusOK, chatResponse{
 		Reply:    out.Reply,
 		Spoken:   out.Spoken,
