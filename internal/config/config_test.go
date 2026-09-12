@@ -35,14 +35,18 @@ func clearAppEnv(t *testing.T) {
 			}
 		}
 		if matched {
-			os.Unsetenv(name)
+			if err := os.Unsetenv(name); err != nil {
+				t.Fatalf("failed to unset env var: %v", err)
+			}
 			restore = append(restore, kv)
 		}
 	}
 	t.Cleanup(func() {
 		for _, kv := range restore {
 			name, val, _ := strings.Cut(kv, "=")
-			os.Setenv(name, val)
+			if err := os.Setenv(name, val); err != nil {
+				t.Fatalf("failed to set env var: %v", err)
+			}
 		}
 	})
 }

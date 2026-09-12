@@ -24,7 +24,7 @@ import (
 // ---------- teste integrado (spec 07 §5, decisão 9 — mocks ponta a ponta) ----------
 // Sobe o servidor COMPLETO (auth + flow real do brain com as tools reais de
 // produção, todas as fronteiras externas mockadas): modelo Genkit fake via
-// genkit.DefineModel (script: 1ª volta tool call, 2ª volta texto), Home
+// genkit.DefineModelAction (script: 1ª volta tool call, 2ª volta texto), Home
 // Assistant e Open-Meteo via httptest. Determinístico: httptest.NewServer
 // (zero porta fixa), zero serviço externo, verde sob -race.
 
@@ -39,7 +39,7 @@ type modeloFake struct {
 	calls int
 }
 
-func (m *modeloFake) handle(_ context.Context, _ *ai.ModelRequest, _ ai.ModelStreamCallback) (*ai.ModelResponse, error) {
+func (m *modeloFake) handle(_ context.Context, _ *ai.ModelRequest, _ any, _ ai.ModelStreamCallback) (*ai.ModelResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
@@ -114,8 +114,8 @@ func montaStack(t *testing.T, steps []any) *stack {
 			SystemRole: true,
 		},
 	}
-	if genkit.DefineModel(g, nomeModeloFake, opts, modelo.handle) == nil {
-		t.Fatal("genkit.DefineModel devolveu nil")
+	if genkit.DefineModelAction(g, nomeModeloFake, opts, modelo.handle) == nil {
+		t.Fatal("genkit.DefineModelAction devolveu nil")
 	}
 
 	haMock := &haMock{}
