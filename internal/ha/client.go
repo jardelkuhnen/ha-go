@@ -85,19 +85,20 @@ func (c *Client) CallService(ctx context.Context, domain, service string, servic
 	return m, nil
 }
 
-// Toggle aciona homeassistant.toggle para o entity (§3).
+// Toggle aciona homeassistant.toggle para o entity (§3). Usa
+// homeassistant.toggle (não o domínio do entity) — comportamento da spec §3.
 func (c *Client) Toggle(ctx context.Context, entityID string) (map[string]any, error) {
 	return c.CallService(ctx, "homeassistant", "toggle", map[string]any{"entity_id": entityID})
 }
 
 // TurnOn liga o entity, com o domínio extraído do prefixo antes do primeiro
-// "." (§3).
+// "." (§3). O entity_id é esperado validado a montante (spec 05).
 func (c *Client) TurnOn(ctx context.Context, entityID string) (map[string]any, error) {
 	return c.CallService(ctx, domainOf(entityID), "turn_on", map[string]any{"entity_id": entityID})
 }
 
 // TurnOff desliga o entity, com o domínio extraído do prefixo antes do
-// primeiro "." (§3).
+// primeiro "." (§3). O entity_id é esperado validado a montante (spec 05).
 func (c *Client) TurnOff(ctx context.Context, entityID string) (map[string]any, error) {
 	return c.CallService(ctx, domainOf(entityID), "turn_off", map[string]any{"entity_id": entityID})
 }
@@ -109,7 +110,8 @@ func domainOf(entityID string) string {
 	return domain
 }
 
-// GetState faz o GET /api/states/{entity_id} (§3).
+// GetState faz o GET /api/states/{entity_id} (§3). entityID vazio faz o HA
+// devolver a tabela inteira de estados — valide o id a montante (spec 05).
 func (c *Client) GetState(ctx context.Context, entityID string) (map[string]any, error) {
 	resp, err := c.do(ctx, "GetState", http.MethodGet, "/api/states/"+url.PathEscape(entityID), nil)
 	if err != nil {
@@ -149,7 +151,7 @@ func (c *Client) do(ctx context.Context, op, method, path string, payload any) (
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, &Error{Op: op, Err: fmt.Errorf("%s %s: %w", method, path, err)}
+		return nil, &Error{Op: op, Err: err}
 	}
 	return resp, nil
 }
@@ -172,7 +174,11 @@ func okStatus(status int) bool { return status >= 200 && status <= 299 }
 // statusError constrói o *Error para um status ≠ 2xx. A mensagem carrega
 // apenas status e motivo — nunca o corpo nem o token (§5).
 func statusError(op string, resp *http.Response) *Error {
-	return &Error{Status: resp.StatusCode, Op: op, Err: errors.New(http.StatusText(resp.StatusCode))}
+	txt := http.StatusText(resp.StatusCode)
+	if txt == "" {
+		txt = "status inesperado"
+	}
+	return &Error{Status: resp.StatusCode, Op: op, Err: errors.New(txt)}
 }
 
 // drainClose drena o corpo (limitado, para reuso da conexão keep-alive) e o

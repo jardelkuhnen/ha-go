@@ -163,10 +163,9 @@ func TestCamposInjetaveis(t *testing.T) { // decisão 12
 	var g gravada
 	ts := novoServidor(t, &g, http.StatusOK, `{"state":"off"}`)
 	c := &Client{
-		baseURL:          ts.URL,
-		token:            "outro-token",
-		alexaMediaEntity: "media_player.outro",
-		http:             &http.Client{Timeout: time.Second},
+		baseURL: ts.URL,
+		token:   "outro-token",
+		http:    &http.Client{Timeout: time.Second},
 	}
 	got, err := c.CallService(context.Background(), "light", "turn_on", nil)
 	if err != nil {

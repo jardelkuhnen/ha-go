@@ -65,6 +65,9 @@ func TestSpeakConexaoRecusadaSemPanico(t *testing.T) { // critério 3c
 	if got.OK || got.Error == "" {
 		t.Fatalf("Speak = %+v; want {OK: false, Error: não-vazio}", got)
 	}
+	if strings.Contains(got.Error, tokenTeste) {
+		t.Errorf("erro vazou o token: %q", got.Error)
+	}
 }
 
 func TestSpeakContextoDoTurnoVence(t *testing.T) { // §4: ctx do turno vence
@@ -77,6 +80,9 @@ func TestSpeakContextoDoTurnoVence(t *testing.T) { // §4: ctx do turno vence
 	got := c.Speak(ctx, "olá")
 	if got.OK || got.Error == "" {
 		t.Fatalf("Speak = %+v; want falha pelo deadline do ctx do turno", got)
+	}
+	if strings.Contains(got.Error, tokenTeste) {
+		t.Errorf("erro vazou o token: %q", got.Error)
 	}
 }
 
