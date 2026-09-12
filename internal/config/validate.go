@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,16 @@ func parseTimeout(key, raw string) (time.Duration, error) {
 	return time.Duration(f * float64(time.Second)), nil
 }
 
+// parseURL valida URL http(s) (paridade com AnyHttpUrl do pydantic);
+// erro cita a variável (§4) e nunca o valor de secrets.
+func parseURL(key, raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", fmt.Errorf("config: %s inválida: %q", key, raw)
+	}
+	return raw, nil
+}
+
 // validate concentra todas as checagens do Load (§3 e §4). Cada task seguinte
 // adiciona suas regras aqui, sempre citando variável e motivo no erro.
 func validate(s *Settings, v *viper.Viper) error {
@@ -87,5 +98,13 @@ func validate(s *Settings, v *viper.Viper) error {
 	if s.HATimeout, err = parseTimeout("HA_TIMEOUT_S", v.GetString("HA_TIMEOUT_S")); err != nil {
 		return err
 	}
+	if s.HAURL, err = parseURL("HA_URL", s.HAURL); err != nil {
+		return err
+	}
+	port, err := strconv.Atoi(v.GetString("BRAIN_PORT"))
+	if err != nil {
+		return fmt.Errorf("config: BRAIN_PORT inválido: %q", v.GetString("BRAIN_PORT"))
+	}
+	s.BrainPort = port
 	return nil
 }

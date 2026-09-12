@@ -40,3 +40,17 @@ func TestParseTimeoutRejeitaInvalidos(t *testing.T) { // critério 5
 		}
 	}
 }
+
+func TestParseURL(t *testing.T) {
+	if _, err := parseURL("HA_URL", "http://home.local:8123"); err != nil {
+		t.Errorf("http válido rejeitado: %v", err)
+	}
+	if _, err := parseURL("HA_URL", "https://ha.example.com"); err != nil {
+		t.Errorf("https válido rejeitado: %v", err)
+	}
+	for _, raw := range []string{"notaurl", "home.local:8123", "ftp://home.local"} {
+		if _, err := parseURL("HA_URL", raw); err == nil {
+			t.Errorf("parseURL(%q): want erro, veio nil", raw)
+		}
+	}
+}

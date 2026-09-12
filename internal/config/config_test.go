@@ -272,3 +272,31 @@ func TestLoadTimeouts(t *testing.T) { // critério 5 no caminho do Load
 		t.Errorf("HATimeout = %v; want 2.5s", s.HATimeout)
 	}
 }
+
+func TestLoadPortaDefaultEInvalida(t *testing.T) {
+	s, err := carrega(t, "", envObrigatorias("ollama"))
+	if err != nil {
+		t.Fatalf("Load: erro inesperado: %v", err)
+	}
+	if s.BrainPort != 8000 {
+		t.Errorf("BrainPort = %d; want default 8000", s.BrainPort)
+	}
+	vars := envObrigatorias("ollama")
+	vars["BRAIN_PORT"] = "abc"
+	if _, err := carrega(t, dotenvDe(vars), nil); err == nil ||
+		!strings.Contains(err.Error(), "config: BRAIN_PORT inválido: \"abc\"") {
+		t.Fatalf("BRAIN_PORT=abc: want erro no formato da §4, veio: %v", err)
+	}
+}
+
+func TestLoadErroNaoVazaSecret(t *testing.T) {
+	vars := envObrigatorias("ollama")
+	vars["HA_URL"] = "notaurl"
+	_, err := carrega(t, dotenvDe(vars), nil)
+	if err == nil {
+		t.Fatal("want erro de HA_URL inválida")
+	}
+	if strings.Contains(err.Error(), "token-ha") {
+		t.Errorf("mensagem de erro vazou o secret: %v", err)
+	}
+}
