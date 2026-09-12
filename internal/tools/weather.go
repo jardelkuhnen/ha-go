@@ -88,6 +88,18 @@ func newWeatherAPI() *weatherAPI {
 	}
 }
 
+// newWeatherAPIEm é a variante injetável do client (decisão 12): endpoints
+// informados em vez dos de produção — seam dos testes integrados da API
+// (spec 07 §5), que apontam geocoding/forecast para httptest. Em produção
+// use newWeatherAPI.
+func newWeatherAPIEm(geocodingURL, forecastURL string) *weatherAPI {
+	return &weatherAPI{
+		geocodingURL: geocodingURL,
+		forecastURL:  forecastURL,
+		http:         &http.Client{Timeout: timeoutClima},
+	}
+}
+
 // weatherInput é a entrada da tool (§2): nome da cidade.
 type weatherInput struct {
 	Location string `json:"location"`

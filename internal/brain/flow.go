@@ -47,6 +47,14 @@ func DefineBrain(m *Motor, cli *ha.Client) *core.Flow[ChatInput, ChatOutput, str
 	return defineBrain(m, cli, tools.Catalog(m.Genkit, cli))
 }
 
+// DefineBrainWithRefs é a variante injetável exportada de defineBrain
+// (decisão 12): mesmo flow "brain" com um catálogo informado — seam dos
+// testes integrados da API (spec 07 §5), que montam o catálogo com httptest.
+// Em produção use DefineBrain.
+func DefineBrainWithRefs(m *Motor, cli *ha.Client, refs []ai.ToolRef) *core.Flow[ChatInput, ChatOutput, struct{}] {
+	return defineBrain(m, cli, refs)
+}
+
 // defineBrain é a variante injetável (decisão 12) — seam dos testes deste
 // package, que registram tools fake no mesmo registry do Genkit.
 func defineBrain(m *Motor, cli *ha.Client, refs []ai.ToolRef) *core.Flow[ChatInput, ChatOutput, struct{}] {
