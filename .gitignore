@@ -1,0 +1,23 @@
+# Secrets e ambiente
+.env
+secrets.yaml
+
+# Dados de runtime do stack (ha/)
+ha/data/
+ha/whisper-data/
+ha/logs/
+**/.storage/
+**/.cache/
+**/.cloud/
+**/deps/
+**/tts/
+**/__pycache__/
+.ha_run.lock
+home-assistant.log*
+*.db
+*.sqlite
+
+# Go
+bin/
+*.test
+*.out
