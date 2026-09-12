@@ -41,6 +41,19 @@ type Settings struct {
 	BrainPort   int
 }
 
+// ResolvedModel devolve o modelo efetivo (§2): LLM_MODEL > OLLAMA_MODEL
+// (provider ollama) > default do provedor. Para gemini/openai o default do
+// provedor é definido na spec 02 — até lá devolve "".
+func (s Settings) ResolvedModel() string {
+	if s.LLMModel != "" {
+		return s.LLMModel
+	}
+	if s.LLMProvider == "ollama" {
+		return s.OllamaModel
+	}
+	return ""
+}
+
 var (
 	once      sync.Once
 	singleton Settings

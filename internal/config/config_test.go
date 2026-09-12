@@ -345,3 +345,47 @@ func TestLoadIgnoraForaDosNamespaces(t *testing.T) { // §3: sistema não bloque
 		t.Fatalf("vars fora dos namespaces não devem bloquear: %v", err)
 	}
 }
+
+func TestLoadPrecedenciaModelo(t *testing.T) { // critério 4
+	casos := []struct {
+		nome string
+		env  map[string]string
+		want string
+	}{
+		{"LLM_MODEL vence sobre OLLAMA_MODEL (ollama)",
+			comModelo("ollama", "gpt-x", "llama-velho"), "gpt-x"},
+		{"sem LLM_MODEL, OLLAMA_MODEL vale (ollama)", comModelo("ollama", "", "llama-2"), "llama-2"},
+		{"sem ambos, default da §2 (ollama)", comModelo("ollama", "", ""), "llama3.2:3b"},
+		{"gemini sem LLM_MODEL → \"\" (default do provedor é da spec 02)", comModelo("gemini", "", ""), ""},
+		{"gemini com LLM_MODEL", comModelo("gemini", "gemini-custom", ""), "gemini-custom"},
+	}
+	for _, tc := range casos {
+		s, err := carrega(t, "", tc.env)
+		if err != nil {
+			t.Fatalf("%s: Load: erro inesperado: %v", tc.nome, err)
+		}
+		if got := s.ResolvedModel(); got != tc.want {
+			t.Errorf("%s: ResolvedModel() = %q; want %q", tc.nome, got, tc.want)
+		}
+	}
+}
+
+// comModelo clona as obrigatórias com o provider e os modelos informados
+// (strings vazias = variável ausente).
+func comModelo(provider, llmModel, ollamaModel string) map[string]string {
+	vars := envObrigatorias(provider)
+	// Adiciona chaves obrigatórias dos provedores
+	if provider == "gemini" {
+		vars["GEMINI_API_KEY"] = "gk-test"
+	}
+	if provider == "openai" {
+		vars["OPENAI_API_KEY"] = "sk-test"
+	}
+	if llmModel != "" {
+		vars["LLM_MODEL"] = llmModel
+	}
+	if ollamaModel != "" {
+		vars["OLLAMA_MODEL"] = ollamaModel
+	}
+	return vars
+}
