@@ -20,8 +20,6 @@ func TestValidEntityID(t *testing.T) { // §3: apenas os dispositivos da casa (m
 	}{
 		{"switch.tomada_sala", true},
 		{"switch.tomada_quarto", true},
-		{"light.luz_sala", true},
-		{"light.luz_quarto", true},
 		{"media_player.alexa_sala", true},
 		{"light.tomada_sala", false},  // tomada alucinada no domínio light (issue #13)
 		{"switch.tomada.sala", false}, // sufixo válido, mas fora do mapa da casa
@@ -63,8 +61,6 @@ func TestAliasOf(t *testing.T) { // §5: mapa em memória — só entidades vali
 	casos := []struct{ entity, want string }{
 		{"switch.tomada_sala", "tomada da sala"},
 		{"switch.tomada_quarto", "tomada do quarto"},
-		{"light.luz_sala", "luz da sala"},
-		{"light.luz_quarto", "luz do quarto"},
 		{"media_player.alexa_sala", "Alexa da sala"},
 	}
 	for _, tc := range casos {
@@ -146,21 +142,6 @@ func TestOnNoSwitchComApelido(t *testing.T) { // critério 1
 		t.Errorf("requisição: %s %s; want POST /api/services/switch/turn_on", g.Method, g.Path)
 	}
 	corpoComEntity(t, g.Body, "switch.tomada_sala")
-}
-
-func TestOffNaLuzComApelido(t *testing.T) { // critério 2
-	var g gravada
-	ts := novoServidor(t, &g, http.StatusOK, `[]`)
-	cli := novoClient(ts)
-
-	got := controlDevice(context.Background(), cli, "off", "light.luz_sala")
-	if got != "Desliguei o luz da sala." {
-		t.Errorf("frase = %q; want %q", got, "Desliguei o luz da sala.")
-	}
-	if g.Method != http.MethodPost || g.Path != "/api/services/light/turn_off" {
-		t.Errorf("requisição: %s %s; want POST /api/services/light/turn_off", g.Method, g.Path)
-	}
-	corpoComEntity(t, g.Body, "light.luz_sala")
 }
 
 func TestToggleEmEntityConhecida(t *testing.T) { // critério 3: toggle de entity conhecida → homeassistant/toggle + apelido

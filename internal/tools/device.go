@@ -30,11 +30,10 @@ const fallbackControlDevice = "Não consegui acionar o dispositivo."
 // schema da tool (device_tool.go) é travado a este mapa por teste
 // (TestSchemaEntityEnumTravado).
 var deviceAliases = map[string]string{
-	"switch.tomada_sala":      "tomada da sala",
-	"switch.tomada_quarto":    "tomada do quarto",
-	"light.luz_sala":          "luz da sala",
-	"light.luz_quarto":        "luz do quarto",
-	"media_player.alexa_sala": "Alexa da sala",
+	"switch.indireta_cozinha":  "indireta cozinha",
+	"switch.principal_cozinha": "principal cozinha",
+	"switch.spot_cozinha":      "spot cozinha",
+	"media_player.alexa_sala":  "Alexa da sala",
 }
 
 // validAction reporta se a ação é uma das aceitas (§2) — estrito, sem trim
