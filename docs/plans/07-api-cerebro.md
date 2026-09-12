@@ -102,8 +102,6 @@ git commit -m "feat(api): contrato HTTP do /chat — health, auth constante, nor
 
 ---
 
-### Task 2 (seams p/ o teste integrado, §5/decisão 12)
-
 ### Task 3: Seam em `internal/tools` — catálogo com Open-Meteo injetável
 
 **Files:**
