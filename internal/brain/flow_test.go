@@ -433,6 +433,67 @@ func TestFlowSystemPromptPorCanal(t *testing.T) { // §5: system prompt do canal
 	}
 }
 
+func TestFlowTextoVazioSemConteudo(t *testing.T) { // §3: texto vazio → "sem conteúdo para falar"
+	fm := &fakeModel{}
+	fm.add("") // resposta do modelo sem texto algum
+	m := novoMotorFake(t, fm)
+	refs := registrarFakeTools(m.Genkit, &fakeTools{})
+
+	var gHA gravadaHA
+	ts := novoServidorHA(t, &gHA, http.StatusOK)
+	cli := novoClientHA(ts)
+
+	out, err := rodarTurno(t, m, cli, refs, ChatInput{Text: "…"})
+	if err != nil {
+		t.Fatalf("flow falhou por texto vazio: %v", err)
+	}
+	if out.Spoken {
+		t.Errorf("Spoken = true; want false (sem conteúdo para falar)")
+	}
+	if out.Error != "sem conteúdo para falar" {
+		t.Errorf("Error = %q; want %q", out.Error, "sem conteúdo para falar")
+	}
+	if out.Reply != "" {
+		t.Errorf("Reply = %q; want vazio", out.Reply)
+	}
+	if gHA.Method != "" || gHA.Path != "" {
+		t.Errorf("speak acionado sem conteúdo: %s %s; want nenhuma requisição", gHA.Method, gHA.Path)
+	}
+}
+
+func TestDefineBrainVinculaCatalogo(t *testing.T) { // §6: catálogo de produção é a única fonte
+	fm := &fakeModel{}
+	fm.add("Já liguei.")
+	m := novoMotorFake(t, fm)
+	// Wiring de produção: DefineBrain vincula tools.Catalog — as duas tools
+	// do §6 ficam registradas e o flow fica endereçável como "brain".
+	flow := DefineBrain(m, nil)
+	if flow == nil {
+		t.Fatal("DefineBrain devolveu nil")
+	}
+	if genkit.LookupTool(m.Genkit, "get_weather") == nil {
+		t.Error("get_weather não registrada pelo catálogo de produção")
+	}
+	if genkit.LookupTool(m.Genkit, "control_device") == nil {
+		t.Error("control_device não registrada pelo catálogo de produção")
+	}
+	if flows := genkit.ListFlows(m.Genkit); len(flows) != 1 {
+		t.Errorf("flows registrados = %d; want 1 (brain)", len(flows))
+	}
+
+	// Turno direto pelo próprio flow de produção (telegram: fim direto —
+	// client nil nunca é tocado e nenhuma tool é executada).
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	out, err := flow.Run(ctx, ChatInput{Text: "oi", Source: "telegram"})
+	if err != nil {
+		t.Fatalf("turno: erro inesperado: %v", err)
+	}
+	if out.Reply != "Já liguei." || out.Spoken || out.Error != "" || len(out.ToolsUsed) != 0 {
+		t.Errorf("out = %+v; want fim direto no telegram", out)
+	}
+}
+
 func TestFlowToolsUsedOrdenado(t *testing.T) { // §2: ToolsUsed ordenado
 	fm := &fakeModel{}
 	fm.add([]ai.ToolRequest{ // duas tools no mesmo turno
