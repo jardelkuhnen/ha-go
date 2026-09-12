@@ -27,8 +27,22 @@ var knownIgnored = map[string]bool{
 // validate concentra todas as checagens do Load (§3 e §4). Cada task seguinte
 // adiciona suas regras aqui, sempre citando variável e motivo no erro.
 func validate(s *Settings, v *viper.Viper) error {
-	if s.LLMProvider == "" {
-		return fmt.Errorf("config: LLM_PROVIDER é obrigatória")
+	switch s.LLMProvider {
+	case "gemini":
+		if s.GeminiAPIKey == "" {
+			return fmt.Errorf("config: GEMINI_API_KEY é obrigatória quando LLM_PROVIDER=gemini")
+		}
+	case "openai":
+		if s.OpenAIAPIKey == "" {
+			return fmt.Errorf("config: OPENAI_API_KEY é obrigatória quando LLM_PROVIDER=openai")
+		}
+	case "ollama":
+		// Motor local: não exige chave.
+	default:
+		if s.LLMProvider == "" {
+			return fmt.Errorf("config: LLM_PROVIDER é obrigatória")
+		}
+		return fmt.Errorf("config: LLM_PROVIDER inválido: %q", s.LLMProvider)
 	}
 	if s.HAURL == "" {
 		return fmt.Errorf("config: HA_URL é obrigatória")

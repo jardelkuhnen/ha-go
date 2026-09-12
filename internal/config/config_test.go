@@ -223,3 +223,35 @@ func TestMustLoadLogaEAborta(t *testing.T) {
 		t.Errorf("mensagem de erro deve manter o prefixo config: %q", msg)
 	}
 }
+
+func TestLoadProviderForaDoEnum(t *testing.T) { // critério 6
+	vars := envObrigatorias("foo")
+	_, err := carrega(t, dotenvDe(vars), nil)
+	if err == nil || !strings.Contains(err.Error(), `config: LLM_PROVIDER inválido: "foo"`) {
+		t.Fatalf("want erro de enum no formato da §4, veio: %v", err)
+	}
+}
+
+func TestLoadChaveCondicionalGemini(t *testing.T) {
+	vars := envObrigatorias("gemini")
+	_, err := carrega(t, dotenvDe(vars), nil)
+	if err == nil || !strings.Contains(err.Error(), "config: GEMINI_API_KEY é obrigatória") {
+		t.Fatalf("gemini sem GEMINI_API_KEY: want erro, veio: %v", err)
+	}
+	vars["GEMINI_API_KEY"] = "gk-123"
+	if _, err := carrega(t, dotenvDe(vars), nil); err != nil {
+		t.Fatalf("gemini com GEMINI_API_KEY: erro inesperado: %v", err)
+	}
+}
+
+func TestLoadChaveCondicionalOpenAI(t *testing.T) {
+	vars := envObrigatorias("openai")
+	_, err := carrega(t, dotenvDe(vars), nil)
+	if err == nil || !strings.Contains(err.Error(), "config: OPENAI_API_KEY é obrigatória") {
+		t.Fatalf("openai sem OPENAI_API_KEY: want erro, veio: %v", err)
+	}
+	vars["OPENAI_API_KEY"] = "sk-123"
+	if _, err := carrega(t, dotenvDe(vars), nil); err != nil {
+		t.Fatalf("openai com OPENAI_API_KEY: erro inesperado: %v", err)
+	}
+}
