@@ -186,3 +186,96 @@ func TestCloseNaoPanica(t *testing.T) {
 	c := novoClient(ts)
 	c.Close() // graceful shutdown: libera conexões ociosas, sem panico
 }
+
+func TestToggleChamaHomeassistant(t *testing.T) { // §3
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	c := novoClient(ts)
+
+	if _, err := c.Toggle(context.Background(), "switch.tomada"); err != nil {
+		t.Fatalf("Toggle: erro inesperado: %v", err)
+	}
+	if g.Method != http.MethodPost || g.Path != "/api/services/homeassistant/toggle" {
+		t.Errorf("requisição: %s %s; want POST /api/services/homeassistant/toggle", g.Method, g.Path)
+	}
+	if diff := corpoDifere(g.Body, map[string]any{"entity_id": "switch.tomada"}); diff != "" {
+		t.Errorf("%s", diff)
+	}
+}
+
+func TestTurnOnExtraiDominioDoEntity(t *testing.T) { // critério 2
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	c := novoClient(ts)
+
+	if _, err := c.TurnOn(context.Background(), "light.luz_sala"); err != nil {
+		t.Fatalf("TurnOn: erro inesperado: %v", err)
+	}
+	if g.Path != "/api/services/light/turn_on" {
+		t.Errorf("path = %q; want /api/services/light/turn_on (domínio do prefixo)", g.Path)
+	}
+	if diff := corpoDifere(g.Body, map[string]any{"entity_id": "light.luz_sala"}); diff != "" {
+		t.Errorf("%s", diff)
+	}
+}
+
+func TestTurnOffExtraiDominioDoEntity(t *testing.T) {
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	c := novoClient(ts)
+
+	if _, err := c.TurnOff(context.Background(), "switch.tomada_cozinha"); err != nil {
+		t.Fatalf("TurnOff: erro inesperado: %v", err)
+	}
+	if g.Path != "/api/services/switch/turn_off" {
+		t.Errorf("path = %q; want /api/services/switch/turn_off", g.Path)
+	}
+}
+
+func TestDomainOf(t *testing.T) { // paridade: entity_id.split(".", 1)[0]
+	casos := []struct{ entity, want string }{
+		{"light.luz_sala", "light"},
+		{"switch.tomada_cozinha", "switch"},
+		{"semDomingo", "semDomingo"}, // sem ".": o próprio entity (paridade)
+	}
+	for _, tc := range casos {
+		if got := domainOf(tc.entity); got != tc.want {
+			t.Errorf("domainOf(%q) = %q; want %q", tc.entity, got, tc.want)
+		}
+	}
+}
+
+func TestGetState(t *testing.T) { // §3
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `{"entity_id":"light.luz_sala","state":"on"}`)
+	c := novoClient(ts)
+
+	got, err := c.GetState(context.Background(), "light.luz_sala")
+	if err != nil {
+		t.Fatalf("GetState: erro inesperado: %v", err)
+	}
+	if g.Method != http.MethodGet || g.Path != "/api/states/light.luz_sala" {
+		t.Errorf("requisição: %s %s; want GET /api/states/light.luz_sala", g.Method, g.Path)
+	}
+	if got["state"] != "on" {
+		t.Errorf("estado = %v; want on", got)
+	}
+}
+
+func TestGetState404ComStatus(t *testing.T) { // critério 4
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusNotFound, `{"message":"Entity not found."}`)
+	c := novoClient(ts)
+
+	_, err := c.GetState(context.Background(), "light.inexistente")
+	var haErr *Error
+	if !errors.As(err, &haErr) {
+		t.Fatalf("want *ha.Error, veio %T: %v", err, err)
+	}
+	if haErr.Status != http.StatusNotFound {
+		t.Errorf("Status = %d; want 404", haErr.Status)
+	}
+	if strings.Contains(err.Error(), tokenTeste) {
+		t.Errorf("mensagem de erro vazou o token: %v", err)
+	}
+}

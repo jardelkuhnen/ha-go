@@ -85,6 +85,47 @@ func (c *Client) CallService(ctx context.Context, domain, service string, servic
 	return m, nil
 }
 
+// Toggle aciona homeassistant.toggle para o entity (§3).
+func (c *Client) Toggle(ctx context.Context, entityID string) (map[string]any, error) {
+	return c.CallService(ctx, "homeassistant", "toggle", map[string]any{"entity_id": entityID})
+}
+
+// TurnOn liga o entity, com o domínio extraído do prefixo antes do primeiro
+// "." (§3).
+func (c *Client) TurnOn(ctx context.Context, entityID string) (map[string]any, error) {
+	return c.CallService(ctx, domainOf(entityID), "turn_on", map[string]any{"entity_id": entityID})
+}
+
+// TurnOff desliga o entity, com o domínio extraído do prefixo antes do
+// primeiro "." (§3).
+func (c *Client) TurnOff(ctx context.Context, entityID string) (map[string]any, error) {
+	return c.CallService(ctx, domainOf(entityID), "turn_off", map[string]any{"entity_id": entityID})
+}
+
+// domainOf devolve o prefixo do entity_id antes do primeiro "." — paridade
+// com entity_id.split(".", 1)[0] do Python (sem ".", devolve o próprio entity).
+func domainOf(entityID string) string {
+	domain, _, _ := strings.Cut(entityID, ".")
+	return domain
+}
+
+// GetState faz o GET /api/states/{entity_id} (§3).
+func (c *Client) GetState(ctx context.Context, entityID string) (map[string]any, error) {
+	resp, err := c.do(ctx, "GetState", http.MethodGet, "/api/states/"+url.PathEscape(entityID), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer drainClose(resp)
+	if !okStatus(resp.StatusCode) {
+		return nil, statusError("GetState", resp)
+	}
+	m, err := decodeState(resp.Body)
+	if err != nil {
+		return nil, &Error{Op: "GetState", Err: err}
+	}
+	return m, nil
+}
+
 // do monta a requisição com os headers padrão (§2) e a envia. Quem chama é
 // responsável por drainClose(resp). Erros preservam a cadeia original (%w) —
 // quem consome pode usar errors.Is(err, context.DeadlineExceeded) e
