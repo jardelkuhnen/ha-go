@@ -13,16 +13,19 @@ import (
 	"home-assistent-go/internal/ha"
 )
 
-func TestValidEntityID(t *testing.T) { // §3: apenas switch/light/media_player + sufixo não vazio
+func TestValidEntityID(t *testing.T) { // §3: apenas os dispositivos da casa (mapa deviceAliases)
 	casos := []struct {
 		entity string
 		want   bool
 	}{
 		{"switch.tomada_sala", true},
+		{"switch.tomada_quarto", true},
 		{"light.luz_sala", true},
+		{"light.luz_quarto", true},
 		{"media_player.alexa_sala", true},
-		{"switch.tomada.sala", true}, // sufixo não vazio mesmo com ponto extra
-		{"camera.frente", false},     // prefixo fora da lista (critério 4)
+		{"light.tomada_sala", false},  // tomada alucinada no domínio light (issue #13)
+		{"switch.tomada.sala", false}, // sufixo válido, mas fora do mapa da casa
+		{"camera.frente", false},      // critério 4
 		{"fan.quarto", false},
 		{"tomada", false},  // sem ponto (critério 5)
 		{"", false},        // vazio (critério 5)
@@ -56,14 +59,13 @@ func TestValidAction(t *testing.T) { // §2: enum estrito on|off|toggle
 	}
 }
 
-func TestAliasOf(t *testing.T) { // §5: mapa em memória; desconhecido → entity cru
+func TestAliasOf(t *testing.T) { // §5: mapa em memória — só entidades validadas (§3) chegam aqui
 	casos := []struct{ entity, want string }{
 		{"switch.tomada_sala", "tomada da sala"},
 		{"switch.tomada_quarto", "tomada do quarto"},
 		{"light.luz_sala", "luz da sala"},
 		{"light.luz_quarto", "luz do quarto"},
 		{"media_player.alexa_sala", "Alexa da sala"},
-		{"switch.ventilador", "switch.ventilador"}, // desconhecido → entity_id cru
 	}
 	for _, tc := range casos {
 		if got := aliasOf(tc.entity); got != tc.want {
@@ -78,7 +80,7 @@ func TestConfirmationPhrase(t *testing.T) { // §5: frases fixas por ação
 	}{
 		{"on", "tomada da sala", "Liguei o tomada da sala."},
 		{"off", "luz da sala", "Desliguei o luz da sala."},
-		{"toggle", "switch.ventilador", "Alternei o switch.ventilador."},
+		{"toggle", "tomada do quarto", "Alternei o tomada do quarto."},
 		{"reboot", "tomada da sala", fallbackControlDevice}, // defesa: ação inválida nunca chega aqui
 	}
 	for _, tc := range casos {
@@ -161,19 +163,19 @@ func TestOffNaLuzComApelido(t *testing.T) { // critério 2
 	corpoComEntity(t, g.Body, "light.luz_sala")
 }
 
-func TestToggleSemApelido(t *testing.T) { // critério 3: homeassistant/toggle + entity cru
+func TestToggleEmEntityConhecida(t *testing.T) { // critério 3: toggle de entity conhecida → homeassistant/toggle + apelido
 	var g gravada
 	ts := novoServidor(t, &g, http.StatusOK, `[]`)
 	cli := novoClient(ts)
 
-	got := controlDevice(context.Background(), cli, "toggle", "switch.ventilador")
-	if got != "Alternei o switch.ventilador." {
-		t.Errorf("frase = %q; want %q", got, "Alternei o switch.ventilador.")
+	got := controlDevice(context.Background(), cli, "toggle", "switch.tomada_quarto")
+	if got != "Alternei o tomada do quarto." {
+		t.Errorf("frase = %q; want %q", got, "Alternei o tomada do quarto.")
 	}
 	if g.Method != http.MethodPost || g.Path != "/api/services/homeassistant/toggle" {
 		t.Errorf("requisição: %s %s; want POST /api/services/homeassistant/toggle", g.Method, g.Path)
 	}
-	corpoComEntity(t, g.Body, "switch.ventilador")
+	corpoComEntity(t, g.Body, "switch.tomada_quarto")
 }
 
 func TestToggleComApelido(t *testing.T) { // §5: toggle de entity conhecido usa o apelido
@@ -193,6 +195,24 @@ func TestEntityInvalidoNaoChamaHA(t *testing.T) { // critério 4: zero requests
 	cli := novoClient(ts)
 
 	got := controlDevice(context.Background(), cli, "on", "camera.frente")
+	if got != fallbackControlDevice {
+		t.Errorf("frase = %q; want fallback %q", got, fallbackControlDevice)
+	}
+	if g.Method != "" || g.Path != "" {
+		t.Errorf("requisição feita ao HA: %s %s; want nenhuma", g.Method, g.Path)
+	}
+}
+
+func TestEntityDesconhecidaNaoChamaHA(t *testing.T) { // issue #13: prefixo válido, mas fora do mapa da casa
+	// O domínio do serviço vem do prefixo do entity_id: uma tomada alucinada
+	// como light.tomada_sala dispararia POST /api/services/light/turn_on —
+	// que o HA responde com 200 mesmo sem o entity. Sem lista fixa, o erro
+	// passa silencioso. A defesa é rejeitar a entity ANTES de tocar no HA.
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
+
+	got := controlDevice(context.Background(), cli, "on", "light.tomada_sala")
 	if got != fallbackControlDevice {
 		t.Errorf("frase = %q; want fallback %q", got, fallbackControlDevice)
 	}
