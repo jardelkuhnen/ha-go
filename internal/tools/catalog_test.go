@@ -103,3 +103,47 @@ func TestCatalogExecutaGetWeatherViaRegistry(t *testing.T) {
 		t.Errorf("forecast: coordenadas = %v; want -23.5505/-46.6333 (input cru chegou à tool)", gPrev.Query)
 	}
 }
+
+// TestCatalogWithWeatherInjetaEndpoints valida a variante injetável
+// exportada (decisão 12, spec 07 §5): catálogo completo com get_weather
+// apontando para os endpoints Open-Meteo informados (httptest) em vez dos de
+// produção — seam dos testes integrados da API.
+func TestCatalogWithWeatherInjetaEndpoints(t *testing.T) {
+	var gGeo, gPrev gravadaMeteo
+	tsGeo := servidorMeteo(t, &gGeo, http.StatusOK,
+		`{"results":[{"latitude":-23.5505,"longitude":-46.6333}]}`)
+	tsPrev := servidorMeteo(t, &gPrev, http.StatusOK,
+		`{"current":{"weather_code":80},"daily":{"temperature_2m_max":[28.4],"temperature_2m_min":[19.2],"weather_code":[80]}}`)
+	var g gravada
+	cli := novoClient(novoServidor(t, &g, http.StatusOK, `[]`))
+
+	ctx := context.Background()
+	gk := genkit.Init(ctx)
+
+	cat := CatalogWithWeather(gk, cli, tsGeo.URL, tsPrev.URL)
+	if len(cat) != 2 {
+		t.Fatalf("catálogo tem %d tools; want 2 (get_weather + control_device)", len(cat))
+	}
+	if cat[0].Name() != "get_weather" || cat[1].Name() != ControlDeviceName {
+		t.Errorf("ordem do catálogo = %s, %s; want get_weather, %s", cat[0].Name(), cat[1].Name(), ControlDeviceName)
+	}
+
+	// A tool executada pelo registry sai pelos servidores de teste — não
+	// pelos endpoints de produção do Open-Meteo.
+	tool := genkit.LookupTool(gk, "get_weather")
+	if tool == nil {
+		t.Fatal("get_weather não registrada pelo CatalogWithWeather")
+	}
+	out, err := tool.RunRaw(ctx, map[string]any{"location": "São Paulo"})
+	if err != nil {
+		t.Fatalf("RunRaw: erro inesperado: %v", err)
+	}
+	if want := "Máxima de 28, mínima de 19, pancadas de chuva"; out != want {
+		t.Errorf("output = %v; want %q", out, want)
+	}
+	// A frase só sai certa se geocoding E forecast vieram dos servidores de
+	// teste (query gravada = endpoints atingidos).
+	if gGeo.Query.Get("name") != "São Paulo" || gPrev.Query.Get("latitude") != "-23.5505" {
+		t.Errorf("endpoints de teste não atingidos: geocoding=%v forecast=%v", gGeo.Query, gPrev.Query)
+	}
+}
