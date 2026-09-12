@@ -9,7 +9,7 @@ import (
 )
 
 // headerAPIKey é o header de auth do POST /chat (§2, baseline item 4).
-const headerAPIKey = "X-API-Key"
+const headerAPIKey = "X-API-Key" // #nosec G101 (nome de header, não credencial)
 
 // authMiddleware valida o X-API-Key antes do handler (§2): header
 // ausente/incorreto → 401 {"error": "invalid api key"}.

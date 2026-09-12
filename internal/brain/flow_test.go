@@ -19,7 +19,7 @@ import (
 	"home-assistent-go/internal/ha"
 )
 
-// ---------- modelo fake (§8: genkit.DefineModel) ----------
+// ---------- modelo fake (§8: genkit.DefineModelAction) ----------
 
 // fakeModel modela um motor cognitivo scriptado: cada chamada de Generate
 // consome o próximo passo do roteiro; um passo único nunca esgota (modelo
@@ -38,7 +38,7 @@ func (f *fakeModel) add(step any) {
 	f.steps = append(f.steps, step)
 }
 
-func (f *fakeModel) handle(ctx context.Context, req *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
+func (f *fakeModel) handle(ctx context.Context, req *ai.ModelRequest, _ any, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.chamadas++
@@ -83,8 +83,8 @@ func novoMotorFake(t *testing.T, fm *fakeModel) *Motor {
 			SystemRole: true,
 		},
 	}
-	if genkit.DefineModel(g, nomeModeloFake, opts, fm.handle) == nil {
-		t.Fatal("DefineModel devolveu nil")
+	if genkit.DefineModelAction(g, nomeModeloFake, opts, fm.handle) == nil {
+		t.Fatal("DefineModelAction devolveu nil")
 	}
 	return &Motor{Genkit: g, Provider: "fake", ModelName: nomeModeloFake, timeout: 2 * time.Second}
 }
