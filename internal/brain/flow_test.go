@@ -519,3 +519,45 @@ func TestFlowToolsUsedOrdenado(t *testing.T) { // §2: ToolsUsed ordenado
 		t.Errorf("ToolsUsed = %v; want [control_device get_weather] (ordenado)", out.ToolsUsed)
 	}
 }
+
+// ---------- seams exportados para o teste integrado da API (spec 07 §5) ----------
+
+// TestNewMotorEDefineBrainWithRefs valida os seams exportados usados pelo
+// teste integrado de internal/api: NewMotor monta o Motor sobre o Genkit com
+// timeout definido (sem ele o context de geração nasce expirado — falha
+// fechada) e DefineBrainWithRefs passa as refs injetadas — o turno se comporta
+// como o defineBrain deste package.
+func TestNewMotorEDefineBrainWithRefs(t *testing.T) {
+	fm := &fakeModel{}
+	fm.add(ai.ToolRequest{Name: "get_weather", Input: map[string]any{"location": "São Paulo"}})
+	fm.add("A máxima é de 28 graus.")
+	mFake := novoMotorFake(t, fm) // genkit com o modelo fake registrado
+	m := NewMotor(mFake.Genkit, mFake.Provider, mFake.ModelName, 2*time.Second)
+
+	ft := &fakeTools{}
+	refs := registrarFakeTools(m.Genkit, ft)
+
+	var gHA gravadaHA
+	cli := novoClientHA(novoServidorHA(t, &gHA, http.StatusOK))
+
+	flow := DefineBrainWithRefs(m, cli, refs)
+	out, err := flow.Run(context.Background(), ChatInput{Text: "clima em São Paulo", Source: "satellite"})
+	if err != nil {
+		t.Fatalf("turno: erro inesperado: %v", err)
+	}
+	if out.Reply != "A máxima é de 28 graus." {
+		t.Errorf("Reply = %q; want o texto do script", out.Reply)
+	}
+	if fmt.Sprint(out.ToolsUsed) != "[get_weather]" {
+		t.Errorf("ToolsUsed = %v; want [get_weather]", out.ToolsUsed)
+	}
+	if !out.Spoken || out.Error != "" {
+		t.Errorf("Spoken/Error = %v/%q; want true/\"\" (speak no canal de voz)", out.Spoken, out.Error)
+	}
+	if got := ft.total(); got != 1 {
+		t.Errorf("tools executadas = %d; want 1 (refs passadas ao flow)", got)
+	}
+	if gHA.Method != http.MethodPost || gHA.Path != "/api/services/notify/alexa_media" {
+		t.Errorf("speak: %s %s; want POST /api/services/notify/alexa_media", gHA.Method, gHA.Path)
+	}
+}
