@@ -50,6 +50,15 @@ func (m *Motor) GenerationContext(parent context.Context) (context.Context, cont
 // inicializado uma vez por processo — o main (spec 07) chama Setup uma vez.
 var setupDone atomic.Bool
 
+// NewMotor monta um Motor sobre uma instância Genkit já inicializada —
+// variante injetável exportada (decisão 12) para os testes integrados da API
+// (spec 07 §5), que não conseguem acessar o campo timeout privado: sem ele o
+// context de geração nasce expirado (falha fechada). Em produção o Motor
+// nasce de Setup.
+func NewMotor(g *genkit.Genkit, provider, modelName string, timeout time.Duration) *Motor {
+	return &Motor{Genkit: g, Provider: provider, ModelName: modelName, timeout: timeout}
+}
+
 // Setup inicializa o motor cognitivo uma única vez por processo: monta só o
 // plugin do LLM_PROVIDER com a credencial pré-validada (registro condicional,
 // §2), inicia o Genkit com o modelo ativo como default (§3), confirma que o
