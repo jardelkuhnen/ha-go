@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // reset limpa o singleton para isolar cada teste. Só existe nos testes.
@@ -253,5 +254,21 @@ func TestLoadChaveCondicionalOpenAI(t *testing.T) {
 	vars["OPENAI_API_KEY"] = "sk-123"
 	if _, err := carrega(t, dotenvDe(vars), nil); err != nil {
 		t.Fatalf("openai com OPENAI_API_KEY: erro inesperado: %v", err)
+	}
+}
+
+func TestLoadTimeouts(t *testing.T) { // critério 5 no caminho do Load
+	vars := envObrigatorias("ollama")
+	vars["LLM_TIMEOUT_S"] = "90"
+	vars["HA_TIMEOUT_S"] = "2.5"
+	s, err := carrega(t, dotenvDe(vars), nil)
+	if err != nil {
+		t.Fatalf("Load: erro inesperado: %v", err)
+	}
+	if s.LLMTimeout != 90*time.Second {
+		t.Errorf("LLMTimeout = %v; want 90s (\"90\" ⇒ 90s)", s.LLMTimeout)
+	}
+	if s.HATimeout != 2500*time.Millisecond {
+		t.Errorf("HATimeout = %v; want 2.5s", s.HATimeout)
 	}
 }

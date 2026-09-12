@@ -2,6 +2,9 @@ package config
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -22,6 +25,27 @@ var knownIgnored = map[string]bool{
 	"ALLOWED_USERS":      true,
 	"BRAIN_URL":          true,
 	"BRAIN_TIMEOUT_S":    true,
+}
+
+// parseTimeout aceita duração do Go ("90s", "1m30s") e, em fallback, número
+// puro em segundos ("30" ⇒ 30s; "30.0" ok — formato do .env do Python).
+// Valores ≤ 0 ou lixo viram erro citando a variável (§4).
+func parseTimeout(key, raw string) (time.Duration, error) {
+	raw = strings.TrimSpace(raw)
+	if d, err := time.ParseDuration(raw); err == nil {
+		if d <= 0 {
+			return 0, fmt.Errorf("config: %s deve ser > 0: %q", key, raw)
+		}
+		return d, nil
+	}
+	f, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, fmt.Errorf("config: %s inválido: %q", key, raw)
+	}
+	if f <= 0 {
+		return 0, fmt.Errorf("config: %s deve ser > 0: %q", key, raw)
+	}
+	return time.Duration(f * float64(time.Second)), nil
 }
 
 // validate concentra todas as checagens do Load (§3 e §4). Cada task seguinte
@@ -55,6 +79,13 @@ func validate(s *Settings, v *viper.Viper) error {
 	}
 	if s.BrainAPIKey == "" {
 		return fmt.Errorf("config: BRAIN_API_KEY é obrigatória")
+	}
+	var err error
+	if s.LLMTimeout, err = parseTimeout("LLM_TIMEOUT_S", v.GetString("LLM_TIMEOUT_S")); err != nil {
+		return err
+	}
+	if s.HATimeout, err = parseTimeout("HA_TIMEOUT_S", v.GetString("HA_TIMEOUT_S")); err != nil {
+		return err
 	}
 	return nil
 }
