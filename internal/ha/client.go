@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -133,7 +134,9 @@ func (c *Client) GetState(ctx context.Context, entityID string) (map[string]any,
 // quem consome pode usar errors.Is(err, context.DeadlineExceeded) e
 // errors.As(err, &net.Error); o token não entra em nenhuma mensagem porque só
 // existe no header (nunca ecoado) e a extração de string no Speak passa por
-// sanitize.
+// sanitize. Toda requisição executada gera um log de diagnóstico: método, path
+// e status (ou a falha de transporte) — o path nunca contém o token e o corpo
+// não é logado.
 func (c *Client) do(ctx context.Context, op, method, path string, payload any) (*http.Response, error) {
 	var body io.Reader
 	if payload != nil {
@@ -151,8 +154,10 @@ func (c *Client) do(ctx context.Context, op, method, path string, payload any) (
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
+		log.Printf("ha: %s %s: falha: %v", method, path, err)
 		return nil, &Error{Op: op, Err: err}
 	}
+	log.Printf("ha: %s %s: HTTP %d", method, path, resp.StatusCode)
 	return resp, nil
 }
 
