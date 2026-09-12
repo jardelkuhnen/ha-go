@@ -42,8 +42,8 @@ type Settings struct {
 }
 
 // ResolvedModel devolve o modelo efetivo (§2): LLM_MODEL > OLLAMA_MODEL
-// (provider ollama) > default do provedor. Para gemini/openai o default do
-// provedor é definido na spec 02 — até lá devolve "".
+// (provider ollama) > default do provedor. Os defaults de gemini/openai são
+// aplicados por brain.ActiveModel (spec 02) — aqui devolve "".
 func (s Settings) ResolvedModel() string {
 	if s.LLMModel != "" {
 		return s.LLMModel
