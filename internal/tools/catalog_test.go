@@ -9,22 +9,32 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 )
 
-// TestCatalogRegistraGetWeather valida o registro Genkit (§2): o catálogo
-// (spec 06 §6) expõe get_weather e o registry a resolve com o contrato — nome,
-// descrição e input schema. Cada teste usa seu próprio genkit.Init (o registry
-// é por instância em v1.13.1; dois Init coexistem num binário de teste).
-func TestCatalogRegistraGetWeather(t *testing.T) {
-	g := genkit.Init(context.Background())
+// TestCatalogRegistraGetWeatherEControlDevice valida o catálogo completo
+// (spec 06 §6): duas tools registradas, na ordem get_weather + control_device,
+// ambas resolvíveis no registry e executáveis pelo caminho cru que a spec 06
+// usa (Generate devolve ToolRequest → LookupTool → RunRaw). Cada teste usa o
+// próprio genkit.Init (o registry é por instância em v1.13.1).
+func TestCatalogRegistraGetWeatherEControlDevice(t *testing.T) {
+	var g gravada
+	ts := novoServidor(t, &g, http.StatusOK, `[]`)
+	cli := novoClient(ts)
 
-	cat := Catalog(g)
-	if len(cat) != 1 {
-		t.Fatalf("catálogo tem %d tools; want 1 (spec 04 entrega só get_weather; spec 05 acrescenta control_device)", len(cat))
+	ctx := context.Background()
+	gk := genkit.Init(ctx)
+
+	cat := Catalog(gk, cli)
+	if len(cat) != 2 {
+		t.Fatalf("catálogo tem %d tools; want 2 (spec 06 §6)", len(cat))
 	}
 	if cat[0].Name() != "get_weather" {
 		t.Errorf("catálogo[0].Name() = %q; want get_weather", cat[0].Name())
 	}
+	if cat[1].Name() != ControlDeviceName {
+		t.Errorf("catálogo[1].Name() = %q; want %q", cat[1].Name(), ControlDeviceName)
+	}
 
-	tool := genkit.LookupTool(g, "get_weather")
+	// get_weather: contrato da spec 04 (nome, descrição, input schema).
+	tool := genkit.LookupTool(gk, "get_weather")
 	if tool == nil {
 		t.Fatal("get_weather não está registrada no registry do Genkit (§2)")
 	}
@@ -39,14 +49,27 @@ func TestCatalogRegistraGetWeather(t *testing.T) {
 	if _, ok := props["location"]; !ok {
 		t.Errorf("inputSchema.properties = %v; want propriedade location (§2)", props)
 	}
+
+	// control_device: contrato da spec 05 e executável pelo registry.
+	cd := genkit.LookupTool(gk, ControlDeviceName)
+	if cd == nil {
+		t.Fatalf("%s não está registrada no registry do Genkit (§2)", ControlDeviceName)
+	}
+	out, err := cd.RunRaw(ctx, map[string]any{"action": "on", "entity_id": "switch.tomada_sala"})
+	if err != nil {
+		t.Fatalf("control_device RunRaw: erro inesperado: %v", err)
+	}
+	if got, ok := out.(string); !ok || got != "Liguei o tomada da sala." {
+		t.Errorf("control_device output = %v (%T); want \"Liguei o tomada da sala.\"", out, out)
+	}
+	if g.Method != http.MethodPost || g.Path != "/api/services/switch/turn_on" {
+		t.Errorf("requisição: %s %s; want POST /api/services/switch/turn_on", g.Method, g.Path)
+	}
 }
 
-// TestToolRunViaGenkit executa a tool pelo registry com input cru (o caminho
-// que a spec 06 usa: Generate devolve ToolRequest → tool executa) com URLs
-// injetadas — valida map JSON → input tipado → frase.
-func TestToolRunViaGenkit(t *testing.T) {
-	g := genkit.Init(context.Background())
-
+// TestCatalogExecutaGetWeatherViaRegistry executa get_weather pelo registry
+// com URLs injetadas — valida map JSON → input tipado → frase.
+func TestCatalogExecutaGetWeatherViaRegistry(t *testing.T) {
 	var gGeo, gPrev gravadaMeteo
 	tsGeo := servidorMeteo(t, &gGeo, http.StatusOK,
 		`{"results":[{"latitude":-23.5505,"longitude":-46.6333}]}`)
@@ -57,13 +80,15 @@ func TestToolRunViaGenkit(t *testing.T) {
 		forecastURL:  tsPrev.URL,
 		http:         &http.Client{Timeout: 2 * time.Second},
 	}
-	_ = newWeatherTool(g, w) // registra a tool com URLs de teste neste registry
+	ctx := context.Background()
+	gk := genkit.Init(ctx)
+	_ = newWeatherTool(gk, w) // registra a tool com URLs de teste neste registry
 
-	tool := genkit.LookupTool(g, "get_weather")
+	tool := genkit.LookupTool(gk, "get_weather")
 	if tool == nil {
 		t.Fatal("get_weather não registrada")
 	}
-	out, err := tool.RunRaw(context.Background(), map[string]any{"location": "São Paulo"})
+	out, err := tool.RunRaw(ctx, map[string]any{"location": "São Paulo"})
 	if err != nil {
 		t.Fatalf("RunRaw: erro inesperado: %v", err)
 	}
