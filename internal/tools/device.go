@@ -9,7 +9,6 @@ package tools
 import (
 	"context"
 	"log"
-	"strings"
 
 	"home-assistent-go/internal/ha"
 )
@@ -25,9 +24,11 @@ const (
 // confirmado, entity inválido, ação inválida ou client ausente.
 const fallbackControlDevice = "Não consegui acionar o dispositivo."
 
-// deviceAliases é o mapa em memória v1 de apelidos amigáveis (§5) — paridade
-// com o mapa hardcoded do Python. Entity fora do mapa → entity_id cru na
-// frase (§5).
+// deviceAliases é a lista fechada v1 dos dispositivos da casa (§5) — paridade
+// com o mapa hardcoded do Python. É a fonte única das entidades aceitas pela
+// validação (§3, issue #13) e dos apelidos na confirmação (§5); o enum do
+// schema da tool (device_tool.go) é travado a este mapa por teste
+// (TestSchemaEntityEnumTravado).
 var deviceAliases = map[string]string{
 	"switch.tomada_sala":      "tomada da sala",
 	"switch.tomada_quarto":    "tomada do quarto",
@@ -47,27 +48,21 @@ func validAction(action string) bool {
 }
 
 // validEntityID valida o entity_id ANTES de qualquer chamada ao HA (§3):
-// apenas os prefixos switch., light. e media_player., seguidos de sufixo não
-// vazio. Baseline de segurança item 3.
+// apenas os dispositivos da casa — as chaves do mapa deviceAliases, que é a
+// lista fixa v1 dos aparelhos. Um entity com prefixo válido mas fora da casa
+// (p. ex. tomada alucinada como light.tomada_sala) dispararia o serviço do
+// domínio errado — o HA responde 200 mesmo sem o entity, e o erro passa
+// silencioso (issue #13). Baseline de segurança item 3.
 func validEntityID(entityID string) bool {
-	domain, suffix, ok := strings.Cut(entityID, ".")
-	if !ok || suffix == "" {
-		return false
-	}
-	switch domain {
-	case "switch", "light", "media_player":
-		return true
-	}
-	return false
+	_, ok := deviceAliases[entityID]
+	return ok
 }
 
-// aliasOf devolve o apelido amigável do entity (§5); desconhecido → o
-// entity_id cru.
+// aliasOf devolve o apelido amigável do entity (§5). Só é chamado após a
+// validação (§3) garantir que o entity está no mapa — o lookup direto nunca
+// erra.
 func aliasOf(entityID string) string {
-	if ap, ok := deviceAliases[entityID]; ok {
-		return ap
-	}
-	return entityID
+	return deviceAliases[entityID]
 }
 
 // confirmationPhrase monta a confirmação falável da ação (§5) — frases exatas

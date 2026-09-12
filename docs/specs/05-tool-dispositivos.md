@@ -13,13 +13,13 @@ via apelidos. TTS **não** vive aqui (ADR-0002 — `speak` é passo do fluxo, sp
 ## 2. Contrato da tool
 
 - **Nome**: `control_device` · **Descrição** (pt): "Liga, desliga ou alterna um dispositivo do Home Assistant."
-- **Input**: `{ "action": "on"|"off"|"toggle", "entity_id": string }`
+- **Input**: `{ "action": "on"|"off"|"toggle", "entity_id": switch.tomada_sala|switch.tomada_quarto|light.luz_sala|light.luz_quarto|media_player.alexa_sala }` — os dois enums ficam fixados no JSON Schema da tool; desvio é rejeitado pelo Genkit no limite da tool (issue #13).
 - **Output**: `string` — confirmação ou mensagem de erro falável.
 
 ## 3. Validação de `entity_id` (antes do HA)
 
-- Aceita apenas prefixos `switch.`, `light.`, `media_player.` seguidos de sufixo não vazio.
-- Inválido → **não chama o HA**; loga warning e retorna a frase de fallback.
+- Duas camadas (issue #13): o schema da tool fixa o enum das entidades da casa (§5), e a validação do núcleo aceita apenas as entidades do mapa de apelidos — lista fechada v1. Um entity com prefixo válido mas fora da casa (p. ex. tomada alucinada como `light.tomada_sala`) dispararia `POST /api/services/light/`, que o HA responde com 200 mesmo sem o entity — o erro passaria silencioso. A lista fechada impede o serviço do domínio errado.
+- Na borda Genkit, desvio do schema → rejeição com erro antes do núcleo. No núcleo, inválido → **não chama o HA**; loga warning e retorna a frase de fallback.
 
 ## 4. Execução (via `*ha.Client` injetado — decisão 7)
 
@@ -41,7 +41,7 @@ light.luz_quarto     → "luz do quarto"
 media_player.alexa_sala → "Alexa da sala"
 ```
 
-Entity desconhecido → usa o `entity_id` cru na frase.
+Entity fora da lista é rejeitado na validação (§3) — não aciona o HA.
 
 - `on` → "Liguei o {apelido}." · `off` → "Desliguei o {apelido}." · `toggle` → "Alternei o {apelido}."
 - Fallback: "Não consegui acionar o dispositivo."
@@ -50,7 +50,9 @@ Entity desconhecido → usa o `entity_id` cru na frase.
 
 1. `on` em `switch.tomada_sala` → `POST /api/services/switch/turn_on` + "Liguei o tomada da sala."
 2. `off` em `light.luz_sala` → `/api/services/light/turn_off` + "Desliguei o luz da sala."
-3. `toggle` em entity sem apelido → `/api/services/homeassistant/toggle` + "Alternei o {entity_id}."
-4. `entity_id` = `camera.frente` → nenhum request ao HA + fallback.
+3. `toggle` em `switch.tomada_quarto` → `/api/services/homeassistant/toggle` + "Alternei o tomada do quarto."
+4. `entity_id` = `camera.frente` → nenhum request ao HA + fallback (núcleo); pela superfície Genkit, rejeitada no schema.
 5. `entity_id` sem ponto / vazio → fallback.
 6. HA responde 500 → fallback (sem panico).
+7. Issue #13: `entity_id` = `light.tomada_sala` (tomada alucinada) → nenhum request ao HA + fallback.
+8. O enum do `entity_id` no schema da tool e o mapa de apelidos (§5) são idênticos — drift travado por teste.
