@@ -21,3 +21,6 @@ home-assistant.log*
 bin/
 *.test
 *.out
+
+# Worktrees locais (uma por spec)
+.worktrees/
