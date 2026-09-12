@@ -29,7 +29,7 @@ func TestParseTimeoutAceitaFormatos(t *testing.T) { // critério 5
 }
 
 func TestParseTimeoutRejeitaInvalidos(t *testing.T) { // critério 5
-	for _, raw := range []string{"0", "-5", "-5s", "0s", "abc", ""} {
+	for _, raw := range []string{"0", "-5", "-5s", "0s", "abc", "", "NaN", "Inf", "+Inf"} {
 		d, err := parseTimeout("LLM_TIMEOUT_S", raw)
 		if err == nil {
 			t.Errorf("parseTimeout(%q) = %v; want erro", raw, d)
@@ -48,7 +48,7 @@ func TestParseURL(t *testing.T) {
 	if _, err := parseURL("HA_URL", "https://ha.example.com"); err != nil {
 		t.Errorf("https válido rejeitado: %v", err)
 	}
-	for _, raw := range []string{"notaurl", "home.local:8123", "ftp://home.local"} {
+	for _, raw := range []string{"notaurl", "home.local:8123", "ftp://home.local", "http://"} {
 		if _, err := parseURL("HA_URL", raw); err == nil {
 			t.Errorf("parseURL(%q): want erro, veio nil", raw)
 		}

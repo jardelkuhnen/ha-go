@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"strconv"
@@ -83,7 +84,7 @@ func parseTimeout(key, raw string) (time.Duration, error) {
 		return d, nil
 	}
 	f, err := strconv.ParseFloat(raw, 64)
-	if err != nil {
+	if err != nil || math.IsInf(f, 0) || math.IsNaN(f) {
 		return 0, fmt.Errorf("config: %s inválido: %q", key, raw)
 	}
 	if f <= 0 {

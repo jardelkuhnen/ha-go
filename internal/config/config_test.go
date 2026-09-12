@@ -389,3 +389,10 @@ func comModelo(provider, llmModel, ollamaModel string) map[string]string {
 	}
 	return vars
 }
+
+func TestLoadDotenvMalformado(t *testing.T) {
+	_, err := carrega(t, "SEM_IGUALDADE_AQUI\n", envObrigatorias("ollama"))
+	if err == nil || !strings.Contains(err.Error(), "config: lendo .env:") {
+		t.Fatalf("want erro de .env malformado com prefixo config:, veio: %v", err)
+	}
+}
