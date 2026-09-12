@@ -92,6 +92,11 @@ func load() (Settings, error) {
 		return Settings{}, fmt.Errorf("config: lendo .env: %w", err)
 	}
 
+	// Varredura estrita (§3): var de namespace do app não reconhecida → erro.
+	if unknown, ok := unknownAppVar(v); ok {
+		return Settings{}, fmt.Errorf("config: variável desconhecida do app: %s", unknown)
+	}
+
 	s := Settings{
 		LLMProvider:      v.GetString("LLM_PROVIDER"),
 		LLMModel:         v.GetString("LLM_MODEL"),

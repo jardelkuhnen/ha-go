@@ -300,3 +300,48 @@ func TestLoadErroNaoVazaSecret(t *testing.T) {
 		t.Errorf("mensagem de erro vazou o secret: %v", err)
 	}
 }
+
+func TestLoadRejeitaDesconhecidaNoDotenv(t *testing.T) { // critério 1
+	_, err := carrega(t, dotenvBase+"HA_TIMEOT_S=5s\n", nil)
+	if err == nil {
+		t.Fatal("Load: want erro para var desconhecida no .env")
+	}
+	if !strings.Contains(err.Error(), "config: variável desconhecida do app: HA_TIMEOT_S") {
+		t.Errorf("erro deve citar a variável no formato da §4: %v", err)
+	}
+}
+
+func TestLoadRejeitaDesconhecidaNoAmbiente(t *testing.T) {
+	vars := envObrigatorias("ollama")
+	vars["TAVILY_SECRET"] = "x"
+	_, err := carrega(t, "", vars)
+	if err == nil || !strings.Contains(err.Error(), "config: variável desconhecida do app: TAVILY_SECRET") {
+		t.Fatalf("want erro citando TAVILY_SECRET, veio: %v", err)
+	}
+}
+
+func TestLoadAceitaConhecidasIgnoradas(t *testing.T) { // critério 2
+	dotenv := dotenvBase + `TAVILY_API_KEY=tvly-xxx
+TELEGRAM_BOT_TOKEN=123:abc
+WHISPER_MODEL=small
+ALLOWED_USERS=11111,22222
+BRAIN_URL=http://localhost:8000
+BRAIN_TIMEOUT_S=90.0
+`
+	s, err := carrega(t, dotenv, nil)
+	if err != nil {
+		t.Fatalf("conhecidas-ignoradas não devem causar erro: %v", err)
+	}
+	if s.HAToken != "token-secreto" {
+		t.Errorf("Load básico quebrou: %+v", s)
+	}
+}
+
+func TestLoadIgnoraForaDosNamespaces(t *testing.T) { // §3: sistema não bloqueia
+	vars := envObrigatorias("ollama")
+	vars["PATH"] = os.Getenv("PATH") // já presente, mas explícito
+	vars["LLMXX_SEM_PREFIXO"] = "x"  // não casa com LLM_ (prefixo exato)
+	if _, err := carrega(t, "", vars); err != nil {
+		t.Fatalf("vars fora dos namespaces não devem bloquear: %v", err)
+	}
+}

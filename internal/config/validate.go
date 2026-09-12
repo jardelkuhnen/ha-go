@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,48 @@ var knownIgnored = map[string]bool{
 	"ALLOWED_USERS":      true,
 	"BRAIN_URL":          true,
 	"BRAIN_TIMEOUT_S":    true,
+}
+
+// recognizedKeys são as chaves que o Load consome (§2).
+var recognizedKeys = map[string]bool{
+	"LLM_PROVIDER": true, "LLM_MODEL": true,
+	"GEMINI_API_KEY": true, "OPENAI_API_KEY": true, "OPENAI_API_BASE": true,
+	"OLLAMA_BASE_URL": true, "OLLAMA_MODEL": true, "LLM_TIMEOUT_S": true,
+	"HA_URL": true, "HA_TOKEN": true, "HA_TIMEOUT_S": true,
+	"ALEXA_MEDIA_ENTITY": true, "BRAIN_API_KEY": true, "BRAIN_PORT": true,
+}
+
+// unknownAppVar varre o ambiente do processo e as chaves do `.env` (viper) e
+// devolve a primeira variável cujo prefixo pertence a um namespace do app e
+// cujo nome não é reconhecido (§3). Matching case-insensitive, em paridade
+// com case_sensitive=False do pydantic-settings.
+func unknownAppVar(v *viper.Viper) (string, bool) {
+	check := func(name string) (string, bool) {
+		name = strings.ToUpper(name)
+		if recognizedKeys[name] || knownIgnored[name] {
+			return "", false
+		}
+		for _, ns := range appNamespaces {
+			if strings.HasPrefix(name, ns) {
+				return name, true
+			}
+		}
+		return "", false
+	}
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		if u, bad := check(name); bad {
+			return u, true
+		}
+	}
+	// AllKeys cobre o `.env` (viper guarda as chaves em minúsculas; AllKeys
+	// também inclui os defaults, todos reconhecidos).
+	for _, key := range v.AllKeys() {
+		if u, bad := check(key); bad {
+			return u, true
+		}
+	}
+	return "", false
 }
 
 // parseTimeout aceita duração do Go ("90s", "1m30s") e, em fallback, número
