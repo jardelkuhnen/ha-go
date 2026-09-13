@@ -70,7 +70,7 @@ Fonte: `src/tools/search.py` → `web_search(query, max_results=3)`
 Fonte: `src/tools/home.py` → `control_device(action, entity_id)`
 - `action` ∈ {on, off, toggle}; delega ao client HA (`turn_on`/`turn_off`/`toggle`).
 - **Validação estrita de `entity_id`** (baseline de segurança item 3): lista fechada dos dispositivos da casa — as entidades do mapa de apelidos, fixadas também no enum do schema da tool. Entity livre deixava o modelo alucinar o domínio (p. ex. tomada como `light.*`) e disparar `/api/services/light/` em vez de `/api/services/switch/` (issue #13) — inválido é rejeitado antes de chegar ao HA.
-- Apelidos amigáveis em memória (`switch.tomada_sala` → "tomada da sala"...) para confirmação falável: "Liguei o tomada da sala." / "Desliguei o ..." / "Alternei o ...".
+- Apelidos amigáveis em memória (`switch.indireta_cozinha` → "indireta cozinha"...) para confirmação falável: "Liguei o indireta cozinha." / "Desliguei o ..." / "Alternei o ...".
 - Defensivo: falha → "Não consegui acionar o dispositivo."
 - Não faz TTS (TTS é nó terminal do fluxo — ADR-0002).
 

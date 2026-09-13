@@ -39,12 +39,12 @@ func TestDefineControlDevice(t *testing.T) {
 		t.Errorf("descrição = %+v; want \"Liga, desliga ou alterna um dispositivo do Home Assistant.\"", def)
 	}
 
-	got, err := ref.RunRaw(ctx, map[string]any{"action": "on", "entity_id": "switch.tomada_sala"})
+	got, err := ref.RunRaw(ctx, map[string]any{"action": "on", "entity_id": "switch.indireta_cozinha"})
 	if err != nil {
 		t.Fatalf("RunRaw: erro inesperado: %v", err)
 	}
-	if got != "Liguei o tomada da sala." {
-		t.Errorf("saída = %v; want \"Liguei o tomada da sala.\"", got)
+	if got != "Liguei o indireta cozinha." {
+		t.Errorf("saída = %v; want \"Liguei o indireta cozinha.\"", got)
 	}
 	if g.Method != http.MethodPost || g.Path != "/api/services/switch/turn_on" {
 		t.Errorf("requisição: %s %s; want POST /api/services/switch/turn_on", g.Method, g.Path)

@@ -18,12 +18,13 @@ func TestValidEntityID(t *testing.T) { // §3: apenas os dispositivos da casa (m
 		entity string
 		want   bool
 	}{
-		{"switch.tomada_sala", true},
-		{"switch.tomada_quarto", true},
+		{"switch.indireta_cozinha", true},
+		{"switch.principal_cozinha", true},
+		{"switch.spot_cozinha", true},
 		{"media_player.alexa_sala", true},
-		{"light.tomada_sala", false},  // tomada alucinada no domínio light (issue #13)
-		{"switch.tomada.sala", false}, // sufixo válido, mas fora do mapa da casa
-		{"camera.frente", false},      // critério 4
+		{"light.indireta_cozinha", false}, // switch alucinado no domínio light (issue #13)
+		{"switch.tomada.sala", false},     // sufixo válido, mas fora do mapa da casa
+		{"camera.frente", false},          // critério 4
 		{"fan.quarto", false},
 		{"tomada", false},  // sem ponto (critério 5)
 		{"", false},        // vazio (critério 5)
@@ -59,8 +60,9 @@ func TestValidAction(t *testing.T) { // §2: enum estrito on|off|toggle
 
 func TestAliasOf(t *testing.T) { // §5: mapa em memória — só entidades validadas (§3) chegam aqui
 	casos := []struct{ entity, want string }{
-		{"switch.tomada_sala", "tomada da sala"},
-		{"switch.tomada_quarto", "tomada do quarto"},
+		{"switch.indireta_cozinha", "indireta cozinha"},
+		{"switch.principal_cozinha", "principal cozinha"},
+		{"switch.spot_cozinha", "spot cozinha"},
 		{"media_player.alexa_sala", "Alexa da sala"},
 	}
 	for _, tc := range casos {
@@ -134,14 +136,14 @@ func TestOnNoSwitchComApelido(t *testing.T) { // critério 1
 	ts := novoServidor(t, &g, http.StatusOK, `[]`)
 	cli := novoClient(ts)
 
-	got := controlDevice(context.Background(), cli, "on", "switch.tomada_sala")
-	if got != "Liguei o tomada da sala." {
-		t.Errorf("frase = %q; want %q", got, "Liguei o tomada da sala.")
+	got := controlDevice(context.Background(), cli, "on", "switch.indireta_cozinha")
+	if got != "Liguei o indireta cozinha." {
+		t.Errorf("frase = %q; want %q", got, "Liguei o indireta cozinha.")
 	}
 	if g.Method != http.MethodPost || g.Path != "/api/services/switch/turn_on" {
 		t.Errorf("requisição: %s %s; want POST /api/services/switch/turn_on", g.Method, g.Path)
 	}
-	corpoComEntity(t, g.Body, "switch.tomada_sala")
+	corpoComEntity(t, g.Body, "switch.indireta_cozinha")
 }
 
 func TestToggleEmEntityConhecida(t *testing.T) { // critério 3: toggle de entity conhecida → homeassistant/toggle + apelido
@@ -149,14 +151,14 @@ func TestToggleEmEntityConhecida(t *testing.T) { // critério 3: toggle de entit
 	ts := novoServidor(t, &g, http.StatusOK, `[]`)
 	cli := novoClient(ts)
 
-	got := controlDevice(context.Background(), cli, "toggle", "switch.tomada_quarto")
-	if got != "Alternei o tomada do quarto." {
-		t.Errorf("frase = %q; want %q", got, "Alternei o tomada do quarto.")
+	got := controlDevice(context.Background(), cli, "toggle", "switch.principal_cozinha")
+	if got != "Alternei o principal cozinha." {
+		t.Errorf("frase = %q; want %q", got, "Alternei o principal cozinha.")
 	}
 	if g.Method != http.MethodPost || g.Path != "/api/services/homeassistant/toggle" {
 		t.Errorf("requisição: %s %s; want POST /api/services/homeassistant/toggle", g.Method, g.Path)
 	}
-	corpoComEntity(t, g.Body, "switch.tomada_quarto")
+	corpoComEntity(t, g.Body, "switch.principal_cozinha")
 }
 
 func TestToggleComApelido(t *testing.T) { // §5: toggle de entity conhecido usa o apelido
@@ -185,15 +187,15 @@ func TestEntityInvalidoNaoChamaHA(t *testing.T) { // critério 4: zero requests
 }
 
 func TestEntityDesconhecidaNaoChamaHA(t *testing.T) { // issue #13: prefixo válido, mas fora do mapa da casa
-	// O domínio do serviço vem do prefixo do entity_id: uma tomada alucinada
-	// como light.tomada_sala dispararia POST /api/services/light/turn_on —
+	// O domínio do serviço vem do prefixo do entity_id: um switch alucinado
+	// como light.indireta_cozinha dispararia POST /api/services/light/turn_on —
 	// que o HA responde com 200 mesmo sem o entity. Sem lista fixa, o erro
 	// passa silencioso. A defesa é rejeitar a entity ANTES de tocar no HA.
 	var g gravada
 	ts := novoServidor(t, &g, http.StatusOK, `[]`)
 	cli := novoClient(ts)
 
-	got := controlDevice(context.Background(), cli, "on", "light.tomada_sala")
+	got := controlDevice(context.Background(), cli, "on", "light.indireta_cozinha")
 	if got != fallbackControlDevice {
 		t.Errorf("frase = %q; want fallback %q", got, fallbackControlDevice)
 	}
@@ -222,7 +224,7 @@ func TestHA500FallbackSemPanico(t *testing.T) { // critério 6
 	ts := novoServidor(t, &g, http.StatusInternalServerError, `{"message":"boom"}`)
 	cli := novoClient(ts)
 
-	got := controlDevice(context.Background(), cli, "on", "switch.tomada_sala")
+	got := controlDevice(context.Background(), cli, "on", "switch.indireta_cozinha")
 	if got != fallbackControlDevice {
 		t.Errorf("frase = %q; want fallback", got)
 	}
@@ -233,7 +235,7 @@ func TestAcaoInvalidaNaoChamaHA(t *testing.T) { // §2: action fora do enum
 	ts := novoServidor(t, &g, http.StatusOK, `[]`)
 	cli := novoClient(ts)
 
-	if got := controlDevice(context.Background(), cli, "reboot", "switch.tomada_sala"); got != fallbackControlDevice {
+	if got := controlDevice(context.Background(), cli, "reboot", "switch.indireta_cozinha"); got != fallbackControlDevice {
 		t.Errorf("frase = %q; want fallback", got)
 	}
 	if g.Method != "" {
@@ -242,7 +244,7 @@ func TestAcaoInvalidaNaoChamaHA(t *testing.T) { // §2: action fora do enum
 }
 
 func TestClientNuloFallbackSemPanico(t *testing.T) { // defensivo: wiring errado não panica
-	got := controlDevice(context.Background(), nil, "on", "switch.tomada_sala")
+	got := controlDevice(context.Background(), nil, "on", "switch.indireta_cozinha")
 	if got != fallbackControlDevice {
 		t.Errorf("frase = %q; want fallback", got)
 	}
@@ -259,7 +261,7 @@ func TestContextoDoTurnoVence(t *testing.T) { // §4: deadline do ctx propaga �
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	if got := controlDevice(ctx, cli, "on", "switch.tomada_sala"); got != fallbackControlDevice {
+	if got := controlDevice(ctx, cli, "on", "switch.indireta_cozinha"); got != fallbackControlDevice {
 		t.Errorf("frase = %q; want fallback (deadline do ctx)", got)
 	}
 }

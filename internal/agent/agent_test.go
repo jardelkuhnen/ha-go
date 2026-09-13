@@ -395,7 +395,7 @@ func TestRunnerToolsUsedOrdenado(t *testing.T) {
 	fm := &fakeModel{}
 	fm.add([]ai.ToolRequest{
 		{Name: "get_weather", Input: map[string]any{"location": "São Paulo"}},
-		{Name: "control_device", Input: map[string]any{"action": "on", "entity_id": "switch.tomada_sala"}},
+		{Name: "control_device", Input: map[string]any{"action": "on", "entity_id": "switch.indireta_cozinha"}},
 	})
 	fm.add("Resolvido.")
 	m := novoMotorFake(t, fm)

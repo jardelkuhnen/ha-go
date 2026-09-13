@@ -49,7 +49,7 @@ func validAction(action string) bool {
 // validEntityID valida o entity_id ANTES de qualquer chamada ao HA (§3):
 // apenas os dispositivos da casa — as chaves do mapa deviceAliases, que é a
 // lista fixa v1 dos aparelhos. Um entity com prefixo válido mas fora da casa
-// (p. ex. tomada alucinada como light.tomada_sala) dispararia o serviço do
+// (p. ex. switch alucinado como light.indireta_cozinha) dispararia o serviço do
 // domínio errado — o HA responde 200 mesmo sem o entity, e o erro passa
 // silencioso (issue #13). Baseline de segurança item 3.
 func validEntityID(entityID string) bool {
