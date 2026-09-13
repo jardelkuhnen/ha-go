@@ -22,5 +22,8 @@ bin/
 *.test
 *.out
 
+# Genkit runtime telemetry (logs, traces, servers)
+.genkit/
+
 # Worktrees locais (uma por spec)
 .worktrees/

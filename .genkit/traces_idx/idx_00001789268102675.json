@@ -1,6 +1,0 @@
-{"id":"bb47e3ea9ddfef12df5737a5062a42d9","type":"flow","start":1789268127325.26,"name":"brain","status":0}
-{"id":"bb47e3ea9ddfef12df5737a5062a42d9","type":"flow","start":1789268127325.26,"name":"brain","end":1789268152857.4272,"status":0}
-{"id":"9ce51b9c6b8d819952752450ecb53017","type":"tool.v2","start":1789268163836.697,"name":"get_weather","status":0}
-{"id":"9ce51b9c6b8d819952752450ecb53017","type":"tool.v2","start":1789268163836.697,"name":"get_weather","end":1789268164064.0227,"status":0}
-{"id":"7682c890d6068bf232e13cc1d74617a1","type":"tool.v2","start":1789268172000.606,"name":"get_weather","status":0}
-{"id":"7682c890d6068bf232e13cc1d74617a1","type":"tool.v2","start":1789268172000.606,"name":"get_weather","end":1789268172474.621,"status":0}
