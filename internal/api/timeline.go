@@ -3,7 +3,7 @@ package api
 import (
 	"fmt"
 
-	"home-assistent-go/internal/brain"
+	"home-assistent-go/internal/agent"
 )
 
 // Agentes da timeline (§3) — paridade de nomes com o projeto Python.
@@ -27,7 +27,7 @@ const (
 // nomes de agent/tool e provider/model. Canal de texto (telegram) não emite
 // evento de Speak: o passo não roda (spec 06 §4.2). Turno abortado (erro do
 // flow) não passa por aqui — não há timeline parcial.
-func (s *server) emitirTimeline(out brain.ChatOutput) {
+func (s *server) emitirTimeline(out agent.ChatOutput) {
 	s.logger.Info("timeline",
 		"agent", agentChatbot,
 		"action", acaoRespostaGerada,
