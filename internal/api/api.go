@@ -12,15 +12,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"home-assistent-go/internal/brain"
+	"home-assistent-go/internal/agent"
 )
 
-// TurnRunner executa um turno conversacional (flow "brain" da spec 06 —
-// §2). O flow de produção (*core.Flow[brain.ChatInput, brain.ChatOutput,
-// struct{}], de brain.DefineBrain) satisfaz a interface; a seam permite
-// testar os handlers sem Genkit.
+// TurnRunner executa um turno conversacional (agente home_assistent). O
+// Runner de produção (agent.Runner, sobre aix.Agent[struct{}]) satisfaz a
+// interface; a seam permite testar os handlers sem Genkit.
 type TurnRunner interface {
-	Run(ctx context.Context, in brain.ChatInput) (brain.ChatOutput, error)
+	Run(ctx context.Context, in agent.ChatInput) (agent.ChatOutput, error)
 }
 
 // Options são as dependências injetadas do router (decisão 12). Logger nil →

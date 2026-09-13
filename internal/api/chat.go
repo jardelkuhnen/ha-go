@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"home-assistent-go/internal/brain"
+	"home-assistent-go/internal/agent"
 )
 
 // sourceDefault é o canal de voz (§2): metadata ausente, source vazio ou só
@@ -55,7 +55,7 @@ func (s *server) chat(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
-	in := brain.ChatInput{Text: *req.Text, Source: sourceNormalizado(req.Metadata)}
+	in := agent.ChatInput{Text: *req.Text, Source: sourceNormalizado(req.Metadata)}
 	if req.Metadata != nil {
 		in.SessionID = req.Metadata.SessionID
 	}

@@ -45,6 +45,21 @@ func (m *Motor) GenerationContext(parent context.Context) (context.Context, cont
 	return context.WithTimeout(parent, m.timeout)
 }
 
+// turnDeadlineMultiplier é o multiplicador do deadline de turno (maxTurns+1):
+// o agente faz até 8 voltas de tools, e cada volta pode custar uma geração —
+// 9 × LLM_TIMEOUT_S cobre o turno inteiro. Mantido em sincronia com
+// ai.WithMaxTurns(8) do DefineHomeAssistent (internal/agent).
+const turnDeadlineMultiplier = 9
+
+// TurnDeadline deriva de parent um context com o deadline de turno inteiro
+// (m.timeout × turnDeadlineMultiplier). A Agents API não expõe timeout por
+// geração — o context de RunText limita o turno todo. Sem timeout configurado
+// o context nasce expirado (fail-closed), igual ao GenerationContext. O caller
+// adia o CancelFunc.
+func (m *Motor) TurnDeadline(parent context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(parent, m.timeout*turnDeadlineMultiplier)
+}
+
 // setupDone guarda a unicidade do Setup: genkit.Init é por-processo (instala
 // handlers de sinal e um registry global), então o motor só pode ser
 // inicializado uma vez por processo — o main (spec 07) chama Setup uma vez.
@@ -75,7 +90,7 @@ func Setup(ctx context.Context, cfg config.Settings) (*Motor, error) {
 		return nil, err
 	}
 	name := modelName(cfg.LLMProvider, ActiveModel(cfg))
-	g := genkit.Init(ctx, genkit.WithPlugins(p), genkit.WithDefaultModel(name))
+	g := genkit.Init(ctx, genkit.WithPlugins(p), genkit.WithDefaultModel(name), genkit.WithExperimental())
 	// A partir daqui o processo já tem o Genkit instalado (handlers de
 	// sinal): não há retry — o guard permanece ocupado.
 	if genkit.LookupModel(g, name) == nil {

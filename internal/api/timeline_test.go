@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"home-assistent-go/internal/brain"
+	"home-assistent-go/internal/agent"
 )
 
 // novoRouterComLog monta o router com logger capturado em buffer (handler de
@@ -68,7 +68,7 @@ func temAtributo(linha, nome string) bool {
 // ---------- §3: um evento por etapa, na ordem ----------
 
 func TestTimelineTurnoComTool(t *testing.T) { // chatbot → tool → speak
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "Hoje faz 28 graus.", Spoken: true,
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "Hoje faz 28 graus.", Spoken: true,
 		ToolsUsed: []string{"get_weather"}}}
 	r, buf := novoRouterComLog(fr)
 	if rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, `{"text":"clima em São Paulo"}`); rec.Code != http.StatusOK {
@@ -113,7 +113,7 @@ func TestTimelineTurnoComTool(t *testing.T) { // chatbot → tool → speak
 }
 
 func TestTimelineSpeakFalho(t *testing.T) { // falha de speak → action negativa + details
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "Hoje faz 28 graus.", Spoken: false,
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "Hoje faz 28 graus.", Spoken: false,
 		Error: "ha: Speak: HTTP 500: Internal Server Error", ToolsUsed: []string{}}}
 	r, buf := novoRouterComLog(fr)
 	if rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, `{"text":"clima"}`); rec.Code != http.StatusOK {
@@ -135,7 +135,7 @@ func TestTimelineSpeakFalho(t *testing.T) { // falha de speak → action negativ
 }
 
 func TestTimelineTelegramSemSpeak(t *testing.T) { // §3/§4.2: canal de texto não emite Speak Agent
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "Markdown ok.", Spoken: false, Error: "", ToolsUsed: []string{}}}
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "Markdown ok.", Spoken: false, Error: "", ToolsUsed: []string{}}}
 	r, buf := novoRouterComLog(fr)
 	if rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, `{"text":"oi","metadata":{"source":"telegram"}}`); rec.Code != http.StatusOK {
 		t.Fatalf("status = %d; want 200", rec.Code)
@@ -150,7 +150,7 @@ func TestTimelineTelegramSemSpeak(t *testing.T) { // §3/§4.2: canal de texto n
 }
 
 func TestTimelineVariasTools(t *testing.T) { // um evento Tool Agent por tool executada
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "Feito.", Spoken: true,
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "Feito.", Spoken: true,
 		ToolsUsed: []string{"control_device", "get_weather"}}}
 	r, buf := novoRouterComLog(fr)
 	if rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, `{"text":"ligue a tomada e diga o clima"}`); rec.Code != http.StatusOK {
@@ -171,7 +171,7 @@ func TestTimelineVariasTools(t *testing.T) { // um evento Tool Agent por tool ex
 // ---------- §3: sem conteúdo nem argumentos do usuário ----------
 
 func TestTimelineSemConteudoDoUsuario(t *testing.T) {
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "Liguei a luz da sala.", Spoken: true,
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "Liguei a luz da sala.", Spoken: true,
 		ToolsUsed: []string{"control_device"}}}
 	r, buf := novoRouterComLog(fr)
 	rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste,

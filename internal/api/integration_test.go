@@ -15,6 +15,7 @@ import (
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 
+	"home-assistent-go/internal/agent"
 	"home-assistent-go/internal/brain"
 	"home-assistent-go/internal/config"
 	"home-assistent-go/internal/ha"
@@ -39,7 +40,7 @@ type modeloFake struct {
 	calls int
 }
 
-func (m *modeloFake) handle(_ context.Context, _ *ai.ModelRequest, _ any, _ ai.ModelStreamCallback) (*ai.ModelResponse, error) {
+func (m *modeloFake) handle(_ context.Context, req *ai.ModelRequest, _ any, _ ai.ModelStreamCallback) (*ai.ModelResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
@@ -52,10 +53,10 @@ func (m *modeloFake) handle(_ context.Context, _ *ai.ModelRequest, _ any, _ ai.M
 	}
 	switch s := step.(type) {
 	case string:
-		return &ai.ModelResponse{Message: ai.NewModelTextMessage(s), FinishReason: ai.FinishReasonStop}, nil
+		return &ai.ModelResponse{Request: req, Message: ai.NewModelTextMessage(s), FinishReason: ai.FinishReasonStop}, nil
 	case ai.ToolRequest:
-		req := s
-		return &ai.ModelResponse{Message: ai.NewModelMessage(ai.NewToolRequestPart(&req)), FinishReason: ai.FinishReasonStop}, nil
+		tr := s
+		return &ai.ModelResponse{Request: req, Message: ai.NewModelMessage(ai.NewToolRequestPart(&tr)), FinishReason: ai.FinishReasonStop}, nil
 	default:
 		return nil, fmt.Errorf("modeloFake: passo inesperado: %T", step)
 	}
@@ -98,12 +99,12 @@ type stack struct {
 // montaStack sobe a stack inteira da §5. Wiring de produção (§4) com só as
 // fronteiras externas trocadas: client HA de produção (ha.NewClient),
 // catálogo real com os endpoints do Open-Meteo apontados aos mocks e flow
-// real (DefineBrainWithRefs — catálogo injetável, única diferença do main).
+// real (agent.DefineHomeAssistentWithRefs — catálogo injetável, única diferença do main).
 func montaStack(t *testing.T, steps []any) *stack {
 	t.Helper()
 	ctx := context.Background()
 
-	g := genkit.Init(ctx)
+	g := genkit.Init(ctx, genkit.WithExperimental())
 	modelo := &modeloFake{steps: steps}
 	opts := &ai.ModelOptions{
 		Label: "modelo fake do teste integrado (spec 07 §5)",
@@ -155,10 +156,11 @@ func montaStack(t *testing.T, steps []any) *stack {
 	})
 	m := brain.NewMotor(g, "ollama", nomeModeloFake, 5*time.Second)
 	refs := tools.CatalogWithWeather(g, cli, tsGeo.URL, tsPrev.URL)
-	flow := brain.DefineBrainWithRefs(m, cli, refs)
+	ag := agent.DefineHomeAssistentWithRefs(m, refs)
+	runner := agent.NewRunner(m, ag, cli)
 
 	router := NewRouter(Options{
-		Runner:   flow,
+		Runner:   runner,
 		APIKey:   chaveTeste,
 		Provider: "ollama",
 		Model:    "llama3.2:3b",
