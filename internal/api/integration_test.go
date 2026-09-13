@@ -99,7 +99,7 @@ type stack struct {
 // montaStack sobe a stack inteira da §5. Wiring de produção (§4) com só as
 // fronteiras externas trocadas: client HA de produção (ha.NewClient),
 // catálogo real com os endpoints do Open-Meteo apontados aos mocks e flow
-// real (DefineBrainWithRefs — catálogo injetável, única diferença do main).
+// real (agent.DefineHomeAssistentWithRefs — catálogo injetável, única diferença do main).
 func montaStack(t *testing.T, steps []any) *stack {
 	t.Helper()
 	ctx := context.Background()
