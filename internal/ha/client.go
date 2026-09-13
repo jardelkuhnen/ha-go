@@ -12,9 +12,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 
 	"home-assistent-go/internal/config"
 )
@@ -128,12 +131,19 @@ func (c *Client) GetState(ctx context.Context, entityID string) (map[string]any,
 	return m, nil
 }
 
+// logCliente emite os logs do client no formato da timeline do motor
+// ("HH:MM:SS | Agente | ação | detalhes") — logger próprio sem as flags
+// padrão do stdlib, que incluiriam data e duplicariam o horário da linha.
+var logCliente = log.New(os.Stderr, "", 0)
+
 // do monta a requisição com os headers padrão (§2) e a envia. Quem chama é
 // responsável por drainClose(resp). Erros preservam a cadeia original (%w) —
 // quem consome pode usar errors.Is(err, context.DeadlineExceeded) e
 // errors.As(err, &net.Error); o token não entra em nenhuma mensagem porque só
 // existe no header (nunca ecoado) e a extração de string no Speak passa por
-// sanitize.
+// sanitize. Toda requisição executada gera um log de diagnóstico no formato
+// da timeline (paridade com o Python): método, path e status — ou a falha de
+// transporte. O path nunca contém o token e o corpo não é logado.
 func (c *Client) do(ctx context.Context, op, method, path string, payload any) (*http.Response, error) {
 	var body io.Reader
 	if payload != nil {
@@ -151,8 +161,12 @@ func (c *Client) do(ctx context.Context, op, method, path string, payload any) (
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
+		logCliente.Printf("%s | %-14s | Requisição executada | method: %s | path: %s | erro: %v",
+			time.Now().Format("15:04:05"), "HA Client", method, path, err)
 		return nil, &Error{Op: op, Err: err}
 	}
+	logCliente.Printf("%s | %-14s | Requisição executada | method: %s | path: %s | status: %d",
+		time.Now().Format("15:04:05"), "HA Client", method, path, resp.StatusCode)
 	return resp, nil
 }
 

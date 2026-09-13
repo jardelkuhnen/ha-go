@@ -55,12 +55,12 @@ func TestCatalogRegistraGetWeatherEControlDevice(t *testing.T) {
 	if cd == nil {
 		t.Fatalf("%s não está registrada no registry do Genkit (§2)", ControlDeviceName)
 	}
-	out, err := cd.RunRaw(ctx, map[string]any{"action": "on", "entity_id": "switch.tomada_sala"})
+	out, err := cd.RunRaw(ctx, map[string]any{"action": "on", "entity_id": "switch.indireta_cozinha"})
 	if err != nil {
 		t.Fatalf("control_device RunRaw: erro inesperado: %v", err)
 	}
-	if got, ok := out.(string); !ok || got != "Liguei o tomada da sala." {
-		t.Errorf("control_device output = %v (%T); want \"Liguei o tomada da sala.\"", out, out)
+	if got, ok := out.(string); !ok || got != "Liguei o indireta cozinha." {
+		t.Errorf("control_device output = %v (%T); want \"Liguei o indireta cozinha.\"", out, out)
 	}
 	if g.Method != http.MethodPost || g.Path != "/api/services/switch/turn_on" {
 		t.Errorf("requisição: %s %s; want POST /api/services/switch/turn_on", g.Method, g.Path)

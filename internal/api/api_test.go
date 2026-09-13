@@ -11,19 +11,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"home-assistent-go/internal/brain"
+	"home-assistent-go/internal/agent"
 )
 
 // ---------- runner fake (o contrato do package: TurnRunner) ----------
 
 // fakeRunner grava a entrada recebida e devolve saída/erro scriptados.
 type fakeRunner struct {
-	in  brain.ChatInput
-	out brain.ChatOutput
+	in  agent.ChatInput
+	out agent.ChatOutput
 	err error
 }
 
-func (f *fakeRunner) Run(_ context.Context, in brain.ChatInput) (brain.ChatOutput, error) {
+func (f *fakeRunner) Run(_ context.Context, in agent.ChatInput) (agent.ChatOutput, error) {
 	f.in = in
 	return f.out, f.err
 }
@@ -112,7 +112,7 @@ func TestChat401HeaderErrado(t *testing.T) { // header incorreto → 401 exato
 }
 
 func TestChatHeaderCorretoPassa(t *testing.T) { // key certa chega ao runner
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "oi", Spoken: false, ToolsUsed: []string{}}}
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "oi", Spoken: false, ToolsUsed: []string{}}}
 	r := novoRouter(fr)
 	rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, `{"text":"oi"}`)
 	if rec.Code != http.StatusOK {
@@ -126,7 +126,7 @@ func TestChatHeaderCorretoPassa(t *testing.T) { // key certa chega ao runner
 // ---------- §2: request — normalização de source é da API ----------
 
 func TestChatSourceNormalizado(t *testing.T) { // trim + lowercase + default
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "ok", ToolsUsed: []string{}}}
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "ok", ToolsUsed: []string{}}}
 	r := novoRouter(fr)
 	casos := []struct{ metadata, want string }{
 		{`{"source":"  Satellite  ","session_id":"sat_1"}`, "satellite"},
@@ -136,7 +136,7 @@ func TestChatSourceNormalizado(t *testing.T) { // trim + lowercase + default
 		{`{"source":"WhatsAPP"}`, "whatsapp"}, // desconhecido passa normalizado
 	}
 	for _, tc := range casos {
-		fr.in = brain.ChatInput{}
+		fr.in = agent.ChatInput{}
 		body := `{"text":"oi","metadata":` + tc.metadata + `}`
 		if rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, body); rec.Code != http.StatusOK {
 			t.Fatalf("metadata %s: status = %d; want 200", tc.metadata, rec.Code)
@@ -148,7 +148,7 @@ func TestChatSourceNormalizado(t *testing.T) { // trim + lowercase + default
 }
 
 func TestChatMetadataOpcional(t *testing.T) { // §2: metadata e campos opcionais
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "ok", ToolsUsed: []string{}}}
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "ok", ToolsUsed: []string{}}}
 	r := novoRouter(fr)
 
 	// sem metadata: source default "satellite", session vazio.
@@ -171,7 +171,7 @@ func TestChatMetadataOpcional(t *testing.T) { // §2: metadata e campos opcionai
 // ---------- §2: response — 200 sempre no fim do turno ----------
 
 func TestChatRespostaExata(t *testing.T) { // critério 2: contrato §2 exato
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "Liguei a luz da sala.", Spoken: true, ToolsUsed: []string{"get_weather"}}}
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "Liguei a luz da sala.", Spoken: true, ToolsUsed: []string{"get_weather"}}}
 	r := novoRouter(fr)
 	rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, `{"text":"ligue a luz da sala"}`)
 	if rec.Code != http.StatusOK {
@@ -194,7 +194,7 @@ func TestChatRespostaExata(t *testing.T) { // critério 2: contrato §2 exato
 }
 
 func TestChatSpeakFalho200(t *testing.T) { // falha de TTS → 200 com error preenchido
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "A máxima é de 28 graus.", Spoken: false,
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "A máxima é de 28 graus.", Spoken: false,
 		Error: "ha: Speak: HTTP 500: Internal Server Error", ToolsUsed: []string{}}}
 	r := novoRouter(fr)
 	rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, `{"text":"clima"}`)
@@ -226,7 +226,7 @@ func TestChatErroFlow500(t *testing.T) { // teto de tools → 500 {"error": …}
 }
 
 func TestChatToolsUsedNuncaNull(t *testing.T) { // §2: array vazio, não null
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "oi", ToolsUsed: []string{}}}
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "oi", ToolsUsed: []string{}}}
 	// runner fake devolve nil para exercitar a defesa do package.
 	fr.out.ToolsUsed = nil
 	r := novoRouter(fr)
@@ -264,7 +264,7 @@ func TestChatCorpoInvalido400(t *testing.T) { // critério 5
 }
 
 func TestChatTextVazioPassaAoFlow(t *testing.T) { // text presente e vazio → flow decide
-	fr := &fakeRunner{out: brain.ChatOutput{Reply: "", Spoken: false, Error: "sem conteúdo para falar", ToolsUsed: []string{}}}
+	fr := &fakeRunner{out: agent.ChatOutput{Reply: "", Spoken: false, Error: "sem conteúdo para falar", ToolsUsed: []string{}}}
 	r := novoRouter(fr)
 	rec := requisicao(t, r, http.MethodPost, "/chat", chaveTeste, `{"text":""}`)
 	if rec.Code != http.StatusOK {

@@ -21,7 +21,7 @@ const ControlDeviceName = "control_device"
 // segurança item 3.
 type ControlDeviceInput struct {
 	Action   string `json:"action" jsonschema:"enum=on,enum=off,enum=toggle" jsonschema_description:"Ação a executar no dispositivo: on (ligar), off (desligar) ou toggle (alternar)"`
-	EntityID string `json:"entity_id" jsonschema:"enum=switch.tomada_sala,enum=switch.tomada_quarto,enum=light.luz_sala,enum=light.luz_quarto,enum=media_player.alexa_sala" jsonschema_description:"Entity ID do dispositivo no Home Assistant. Dispositivos da casa: switch.tomada_sala (tomada da sala), switch.tomada_quarto (tomada do quarto), light.luz_sala (luz da sala), light.luz_quarto (luz do quarto) ou media_player.alexa_sala (Alexa da sala)"`
+	EntityID string `json:"entity_id" jsonschema:"enum=switch.indireta_cozinha,enum=switch.principal_cozinha,enum=switch.spot_cozinha,enum=media_player.alexa_sala" jsonschema_description:"Entity ID do dispositivo no Home Assistant. Dispositivos da casa: switch.indireta_cozinha (indireta cozinha), switch.principal_cozinha (principal cozinha), switch.spot_cozinha (spot cozinha) ou media_player.alexa_sala (Alexa da sala)"`
 }
 
 // DefineControlDevice registra a tool control_device no registry do Genkit

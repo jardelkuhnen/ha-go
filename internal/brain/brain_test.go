@@ -96,3 +96,49 @@ func TestGenerationContextHerdaCancelamento(t *testing.T) {
 		t.Fatal("cancelamento do parent não propagou para o context de geração")
 	}
 }
+
+func TestTurnDeadlineDefineDeadline(t *testing.T) {
+	// TurnDeadline = timeout × 9 (maxTurns(8) + 1): o orçamento de um turno
+	// multi-tool. Sem timeout → fail-closed (context nasce expirado), igual
+	// ao GenerationContext.
+	m := &Motor{timeout: 50 * time.Millisecond}
+	ctx, cancel := m.TurnDeadline(context.Background())
+	defer cancel()
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("TurnDeadline: context sem deadline")
+	}
+	if got := time.Until(deadline); got <= 0 || got > 450*time.Millisecond {
+		t.Errorf("deadline em %v; want (0, 450ms] (50ms × 9)", got)
+	}
+}
+
+func TestTurnDeadlineTimeoutZeroFalhaFechado(t *testing.T) {
+	m := &Motor{}
+	ctx, cancel := m.TurnDeadline(context.Background())
+	defer cancel()
+	select {
+	case <-ctx.Done():
+		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			t.Fatalf("ctx.Err() = %v; want DeadlineExceeded", ctx.Err())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Motor sem timeout deveria nascer expirado (fail-closed)")
+	}
+}
+
+func TestTurnDeadlineHerdaCancelamento(t *testing.T) {
+	m := &Motor{timeout: time.Hour}
+	parent, pcancel := context.WithCancel(context.Background())
+	ctx, cancel := m.TurnDeadline(parent)
+	defer cancel()
+	pcancel()
+	select {
+	case <-ctx.Done():
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			t.Fatalf("ctx.Err() = %v; want Canceled", ctx.Err())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cancelamento do parent não propagou para o TurnDeadline")
+	}
+}

@@ -30,11 +30,10 @@ const fallbackControlDevice = "Não consegui acionar o dispositivo."
 // schema da tool (device_tool.go) é travado a este mapa por teste
 // (TestSchemaEntityEnumTravado).
 var deviceAliases = map[string]string{
-	"switch.tomada_sala":      "tomada da sala",
-	"switch.tomada_quarto":    "tomada do quarto",
-	"light.luz_sala":          "luz da sala",
-	"light.luz_quarto":        "luz do quarto",
-	"media_player.alexa_sala": "Alexa da sala",
+	"switch.indireta_cozinha":  "indireta cozinha",
+	"switch.principal_cozinha": "principal cozinha",
+	"switch.spot_cozinha":      "spot cozinha",
+	"media_player.alexa_sala":  "Alexa da sala",
 }
 
 // validAction reporta se a ação é uma das aceitas (§2) — estrito, sem trim
@@ -50,7 +49,7 @@ func validAction(action string) bool {
 // validEntityID valida o entity_id ANTES de qualquer chamada ao HA (§3):
 // apenas os dispositivos da casa — as chaves do mapa deviceAliases, que é a
 // lista fixa v1 dos aparelhos. Um entity com prefixo válido mas fora da casa
-// (p. ex. tomada alucinada como light.tomada_sala) dispararia o serviço do
+// (p. ex. switch alucinado como light.indireta_cozinha) dispararia o serviço do
 // domínio errado — o HA responde 200 mesmo sem o entity, e o erro passa
 // silencioso (issue #13). Baseline de segurança item 3.
 func validEntityID(entityID string) bool {

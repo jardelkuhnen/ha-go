@@ -1,7 +1,7 @@
 .PHONY: run build fmt vet test tidy
 
 run:
-	go run ./cmd/brain
+	npx genkit start -- go run ./cmd/brain
 
 build:
 	go build -o bin/brain ./cmd/brain
