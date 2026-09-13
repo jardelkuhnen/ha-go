@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"home-assistent-go/internal/agent"
 	"home-assistent-go/internal/api"
 	"home-assistent-go/internal/brain"
 	"home-assistent-go/internal/config"
@@ -49,10 +50,12 @@ func main() {
 	// §4.3: client HA único (spec 03) — fechado só depois do dreno.
 	cli := ha.NewClient(cfg)
 
-	// §4.4/§4.5: flow "brain" com client + tools — DefineBrain vincula o
-	// catálogo único (tools.Catalog, spec 06 §6) ao registry; chamar
-	// tools.Catalog de novo registraria as actions em duplicidade (panico).
-	flow := brain.DefineBrain(motor, cli)
+	// Agente home_assistent sobre a Agents API do Genkit (genkit/exp.DefineAgent):
+	// o framework roda o loop de tools internamente. DefineHomeAssistent vincula
+	// o catálogo único (tools.Catalog) ao agente; chamar tools.Catalog de novo
+	// registraria as tools em duplicidade (panic).
+	ag := agent.DefineHomeAssistent(motor, cli)
+	runner := agent.NewRunner(motor, ag, cli)
 
 	// Logger estruturado da timeline (§3) — texto no stderr.
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -60,7 +63,7 @@ func main() {
 	// §4.6: router Gin + middleware auth (X-API-Key em tempo constante).
 	modelo := brain.ActiveModel(cfg)
 	router := api.NewRouter(api.Options{
-		Runner:   flow,
+		Runner:   runner,
 		APIKey:   cfg.BrainAPIKey,
 		Provider: motor.Provider,
 		Model:    modelo,
